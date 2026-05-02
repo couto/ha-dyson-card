@@ -72,9 +72,15 @@ class HaDysonCard extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._busy = false;
-    this._localDirection = null;
-    this._localWidth = null;
+    this._draftDirection = null;
+    this._draftWidth = null;
     this._draggingDial = false;
+    this._derived = null;
+    this._pendingDirection = null;
+    this._pendingWidth = null;
+    this._pendingSince = null;
+    this._pendingLabel = "";
+    this._pendingTimer = null;
   }
 
   setConfig(config) {
@@ -86,11 +92,15 @@ class HaDysonCard extends HTMLElement {
       default_oscillation_angle: 90,
       ...config,
     };
+    this._derived = null;
+    this._clearPending(false);
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._ensureDerived();
+    this._reconcilePendingState();
     this._render();
   }
 
@@ -223,10 +233,20 @@ class HaDysonCard extends HTMLElement {
     return Math.max(0, Math.min(350, Math.round(normalized / 5) * 5));
   }
 
+  _normalizeDeviceAngle(value) {
+    if (!Number.isFinite(Number(value))) return 0;
+    return Math.max(0, Math.min(350, Math.round(Number(value))));
+  }
+
+  _clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
   _extractBounds(attributes) {
     const lowerCandidates = [
       attributes.lower_angle,
       attributes.lowerAngle,
+      attributes.angle_low,
       attributes.oscillation_lower_angle,
       attributes.oscillationLowerAngle,
       attributes.oscillation_min_angle,
@@ -235,6 +255,7 @@ class HaDysonCard extends HTMLElement {
     const upperCandidates = [
       attributes.upper_angle,
       attributes.upperAngle,
+      attributes.angle_high,
       attributes.oscillation_upper_angle,
       attributes.oscillationUpperAngle,
       attributes.oscillation_max_angle,
@@ -246,15 +267,60 @@ class HaDysonCard extends HTMLElement {
       return null;
     }
     return {
-      lower: this._normalizeAngle(lower),
-      upper: this._normalizeAngle(upper),
+      lower: this._normalizeDeviceAngle(lower),
+      upper: this._normalizeDeviceAngle(upper),
     };
+  }
+
+  _selectAttributes() {
+    return this._stateObj(this._oscillationSelectEntity())?.attributes || {};
+  }
+
+  _currentBounds(attributes) {
+    const fromFan = this._extractBounds(attributes);
+    if (fromFan) return fromFan;
+
+    const selectAttributes = this._selectAttributes();
+    const lower = Number(selectAttributes.oscillation_angle_low);
+    const upper = Number(selectAttributes.oscillation_angle_high);
+    if (Number.isFinite(lower) && Number.isFinite(upper)) {
+      return {
+        lower: this._normalizeDeviceAngle(lower),
+        upper: this._normalizeDeviceAngle(upper),
+      };
+    }
+
+    const lowerEntity = this._derived?.oscillationLowEntity || "";
+    const highEntity = this._derived?.oscillationHighEntity || "";
+    const lowerState = this._numericState(lowerEntity);
+    const highState = this._numericState(highEntity);
+    if (lowerState !== null && highState !== null) {
+      return {
+        lower: this._normalizeDeviceAngle(lowerState),
+        upper: this._normalizeDeviceAngle(highState),
+      };
+    }
+
+    return null;
+  }
+
+  _oscillationEnabled(attributes) {
+    if (typeof attributes.oscillation_enabled === "boolean") {
+      return attributes.oscillation_enabled;
+    }
+    if (typeof attributes.oscillating === "boolean") {
+      return attributes.oscillating;
+    }
+    const selectAttributes = this._selectAttributes();
+    if (typeof selectAttributes.oscillation_enabled === "boolean") {
+      return selectAttributes.oscillation_enabled;
+    }
+    return null;
   }
 
   _widthFromBounds(bounds) {
     if (!bounds) return null;
-    const delta = ((bounds.upper - bounds.lower) + 360) % 360;
-    return this._normalizeAngle(delta);
+    return this._normalizeAngle(bounds.upper - bounds.lower);
   }
 
   _centerFromBounds(bounds) {
@@ -263,32 +329,107 @@ class HaDysonCard extends HTMLElement {
     return this._normalizeAngle(bounds.lower + (width / 2));
   }
 
-  _currentWidth(attributes) {
-    if (Number.isFinite(this._localWidth)) {
-      return this._normalizeAngle(this._localWidth);
+  _sourceWidth(attributes) {
+    if (this._oscillationEnabled(attributes) === false) {
+      return 0;
     }
-    const fromEntity = this._numericState(this._config.oscillation_angle_entity);
-    if (fromEntity !== null) {
-      return this._normalizeAngle(fromEntity);
-    }
-    const bounds = this._extractBounds(attributes);
+    const bounds = this._currentBounds(attributes);
     const fromBounds = this._widthFromBounds(bounds);
     if (fromBounds !== null) {
       return fromBounds;
     }
+    const fromEntity = this._numericState(this._oscillationAngleEntity());
+    if (fromEntity !== null) {
+      return this._normalizeAngle(fromEntity);
+    }
     return this._normalizeAngle(this._config.default_oscillation_angle || 90);
   }
 
-  _currentDirection(attributes) {
-    if (Number.isFinite(this._localDirection)) {
-      return this._normalizeAngle(this._localDirection);
-    }
-    const bounds = this._extractBounds(attributes);
+  _sourceDirection(attributes) {
+    const bounds = this._currentBounds(attributes);
     const fromBounds = this._centerFromBounds(bounds);
     if (fromBounds !== null) {
       return fromBounds;
     }
+    const centerFromEntity = this._numericState(this._oscillationCenterEntity());
+    if (centerFromEntity !== null) {
+      return this._normalizeAngle(centerFromEntity);
+    }
     return 180;
+  }
+
+  _pendingActive() {
+    return Number.isFinite(this._pendingSince) && Date.now() - this._pendingSince < 90000;
+  }
+
+  _setPendingDirection(direction, width, label) {
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    this._pendingDirection = bounds.center;
+    this._pendingWidth = bounds.width;
+    this._pendingSince = Date.now();
+    this._pendingLabel = label;
+
+    if (this._pendingTimer) {
+      clearTimeout(this._pendingTimer);
+    }
+    this._pendingTimer = setTimeout(() => {
+      this._clearPending();
+    }, 90000);
+  }
+
+  _clearPending(render = true) {
+    if (this._pendingTimer) {
+      clearTimeout(this._pendingTimer);
+      this._pendingTimer = null;
+    }
+    this._pendingDirection = null;
+    this._pendingWidth = null;
+    this._pendingSince = null;
+    this._pendingLabel = "";
+    if (render) {
+      this._render();
+    }
+  }
+
+  _anglesMatch(sourceDirection, sourceWidth) {
+    if (!this._pendingActive()) return false;
+    return this._normalizeAngle(sourceDirection) === this._normalizeAngle(this._pendingDirection)
+      && this._normalizeAngle(sourceWidth) === this._normalizeAngle(this._pendingWidth);
+  }
+
+  _reconcilePendingState() {
+    if (!this._pendingActive()) {
+      if (this._pendingSince !== null) {
+        this._clearPending(false);
+      }
+      return;
+    }
+    const fan = this._config.entity ? this._hass?.states?.[this._config.entity] : null;
+    if (!fan) return;
+    const attributes = fan.attributes || {};
+    if (this._anglesMatch(this._sourceDirection(attributes), this._sourceWidth(attributes))) {
+      this._clearPending(false);
+    }
+  }
+
+  _currentWidth(attributes) {
+    if (this._draggingDial && Number.isFinite(this._draftWidth)) {
+      return this._normalizeAngle(this._draftWidth);
+    }
+    if (this._pendingActive() && Number.isFinite(this._pendingWidth)) {
+      return this._normalizeAngle(this._pendingWidth);
+    }
+    return this._sourceWidth(attributes);
+  }
+
+  _currentDirection(attributes) {
+    if (this._draggingDial && Number.isFinite(this._draftDirection)) {
+      return this._normalizeAngle(this._draftDirection);
+    }
+    if (this._pendingActive() && Number.isFinite(this._pendingDirection)) {
+      return this._normalizeAngle(this._pendingDirection);
+    }
+    return this._sourceDirection(attributes);
   }
 
   _displayAngle(direction, width) {
@@ -296,6 +437,17 @@ class HaDysonCard extends HTMLElement {
       return `${direction}\u00b0 direct`;
     }
     return `${direction}\u00b0 center \u00b7 ${width}\u00b0 sweep`;
+  }
+
+  _boundsFromCenterWidth(direction, width) {
+    const normalizedWidth = this._normalizeAngle(width);
+    const halfWidth = normalizedWidth / 2;
+    const requestedCenter = this._normalizeAngle(direction);
+    const constrainedCenter = this._clamp(requestedCenter, halfWidth, 350 - halfWidth);
+    const lower = this._normalizeDeviceAngle(constrainedCenter - halfWidth);
+    const upper = this._normalizeDeviceAngle(constrainedCenter + halfWidth);
+    const center = this._normalizeAngle(lower + ((upper - lower) / 2));
+    return { lower, upper, center, width: normalizedWidth };
   }
 
   _pointForAngle(cx, cy, radius, angle) {
@@ -320,6 +472,49 @@ class HaDysonCard extends HTMLElement {
     const sweep = ((endAngle - startAngle) + 360) % 360;
     const largeArc = sweep > 180 ? 1 : 0;
     return `M ${cx} ${cy} L ${start.x} ${start.y} A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+  }
+
+  _updateDialPreview(direction, width) {
+    const wheel = this.shadowRoot;
+    if (!wheel) return;
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const handle = this._pointForAngle(160, 160, 120, bounds.center);
+    const cone = wheel.querySelector(".wheel-cone");
+    const direct = wheel.querySelector(".wheel-direct");
+    const handleCircle = wheel.querySelector(".wheel-handle");
+    const angleNode = wheel.querySelector(".direction-angle");
+    const subtitleNode = wheel.querySelector(".subtitle");
+
+    if (angleNode) {
+      angleNode.textContent = `${bounds.center}\u00b0`;
+    }
+    if (subtitleNode) {
+      subtitleNode.textContent = this._displayAngle(bounds.center, bounds.width);
+    }
+    if (handleCircle) {
+      handleCircle.setAttribute("cx", String(handle.x));
+      handleCircle.setAttribute("cy", String(handle.y));
+    }
+
+    if (bounds.width === 0) {
+      if (cone) {
+        cone.setAttribute("d", "");
+        cone.style.display = "none";
+      }
+      if (direct) {
+        direct.setAttribute("d", this._arcPath(160, 160, 116, bounds.center - 1, bounds.center + 1));
+        direct.style.display = "";
+      }
+      return;
+    }
+
+    if (cone) {
+      cone.setAttribute("d", this._sectorPath(160, 160, 128, bounds.lower, bounds.upper));
+      cone.style.display = "";
+    }
+    if (direct) {
+      direct.style.display = "none";
+    }
   }
 
   _renderMetric(label, value, unit = "") {
@@ -347,32 +542,54 @@ class HaDysonCard extends HTMLElement {
   }
 
   async _commitDirection(direction, width) {
-    if (!this._hass || !this._config.device_id || this._busy) return;
-    const normalizedDirection = this._normalizeAngle(direction);
-    const normalizedWidth = this._normalizeAngle(width);
-    const lower = this._normalizeAngle(normalizedDirection - (normalizedWidth / 2));
-    const upper = this._normalizeAngle(normalizedDirection + (normalizedWidth / 2));
+    const deviceId = this._deviceId();
+    if (!this._hass || !deviceId || this._busy) return;
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const { lower, upper, center, width: normalizedWidth } = bounds;
+    const directMode = normalizedWidth === 0;
 
     this._busy = true;
-    this._localDirection = normalizedDirection;
-    this._localWidth = normalizedWidth;
+    this._setPendingDirection(center, normalizedWidth, directMode ? "Pointing fan" : "Applying angle");
     this._render();
 
     try {
-      await this._hass.callService("hass_dyson", "set_oscillation_angles", {
-        device_id: this._config.device_id,
-        lower_angle: lower,
-        upper_angle: upper,
-      });
-
-      if (this._config.oscillation_angle_entity) {
+      if (directMode) {
+        await this._hass.callService("fan", "oscillate", {
+          entity_id: this._config.entity,
+          oscillating: false,
+        });
+        await this._hass.callService("hass_dyson", "set_oscillation_angles", {
+          device_id: deviceId,
+          lower_angle: center,
+          upper_angle: center,
+        });
+      } else if (this._oscillationCenterEntity()) {
         await this._hass.callService("number", "set_value", {
-          entity_id: this._config.oscillation_angle_entity,
-          value: normalizedWidth,
+          entity_id: this._oscillationCenterEntity(),
+          value: center,
+        });
+        await this._hass.callService("fan", "oscillate", {
+          entity_id: this._config.entity,
+          oscillating: true,
+        });
+      } else {
+        await this._hass.callService("hass_dyson", "set_oscillation_angles", {
+          device_id: deviceId,
+          lower_angle: lower,
+          upper_angle: upper,
+        });
+        await this._hass.callService("fan", "oscillate", {
+          entity_id: this._config.entity,
+          oscillating: true,
         });
       }
+    } catch (error) {
+      this._clearPending(false);
+      throw error;
     } finally {
       this._busy = false;
+      this._draftDirection = null;
+      this._draftWidth = null;
       this._render();
     }
   }
@@ -472,21 +689,25 @@ class HaDysonCard extends HTMLElement {
     const powerState = fan.state === "on" ? "On" : "Off";
     const mode = attributes.preset_mode || attributes.mode || "Unknown";
     const speed = attributes.percentage ?? attributes.speed ?? "Unknown";
-    const temp = this._stateValue(this._config.temperature_entity, "");
-    const humidity = this._stateValue(this._config.humidity_entity, "");
-    const airQuality = this._stateValue(this._config.air_quality_entity, "");
+    const temp = this._stateValue(this._temperatureEntity(), "");
+    const humidity = this._stateValue(this._humidityEntity(), "");
+    const airQuality = this._stateValue(this._airQualityEntity(), "");
     const direction = this._currentDirection(attributes);
     const width = this._currentWidth(attributes);
-    const sweep = width || 0;
-    const startAngle = this._normalizeAngle(direction - (sweep / 2));
-    const endAngle = this._normalizeAngle(direction + (sweep / 2));
-    const handle = this._pointForAngle(160, 160, 120, direction);
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const handle = this._pointForAngle(160, 160, 120, bounds.center);
     const presetWidths = [0, 45, 90, 180, 350];
-    const controlReady = Boolean(this._config.device_id);
-    const conePath = sweep
-      ? this._sectorPath(160, 160, 128, startAngle, endAngle)
+    const controlReady = Boolean(this._deviceId());
+    const operationActive = this._busy || this._pendingActive();
+    const operationLabel = this._busy
+      ? this._pendingLabel || "Applying"
+      : this._pendingActive()
+        ? this._pendingLabel || "Waiting for device"
+        : "";
+    const conePath = bounds.width
+      ? this._sectorPath(160, 160, 128, bounds.lower, bounds.upper)
       : "";
-    const directPath = this._arcPath(160, 160, 116, direction - 1, direction + 1);
+    const directPath = this._arcPath(160, 160, 116, bounds.center - 1, bounds.center + 1);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -691,7 +912,7 @@ class HaDysonCard extends HTMLElement {
           <div class="header">
             <div class="title-stack">
               <div class="title">${title}</div>
-              <div class="subtitle">${this._displayAngle(direction, width)}</div>
+              <div class="subtitle">${this._displayAngle(bounds.center, bounds.width)}</div>
             </div>
             <div class="chip">${powerState}</div>
           </div>
@@ -702,7 +923,8 @@ class HaDysonCard extends HTMLElement {
                 <circle class="wheel-bg" cx="160" cy="160" r="128"></circle>
                 <circle class="wheel-ring" cx="160" cy="160" r="128"></circle>
                 <line class="wheel-anchor" x1="160" y1="18" x2="160" y2="40"></line>
-                ${sweep ? `<path class="wheel-cone" d="${conePath}"></path>` : `<path class="wheel-direct" d="${directPath}"></path>`}
+                <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
+                <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
                 <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
                 <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
                 <text class="wheel-core-label" x="160" y="166" text-anchor="middle">Dyson</text>
@@ -711,15 +933,15 @@ class HaDysonCard extends HTMLElement {
             </button>
 
             <div class="direction-readout">
-              <div class="direction-angle">${direction}\u00b0</div>
+              <div class="direction-angle">${bounds.center}\u00b0</div>
               <div class="direction-copy">
-                ${controlReady ? "Drag the dial to aim the fan. Use presets to widen or collapse the cone." : "Add a hass_dyson device_id in the card editor to enable direction control."}
+                ${controlReady ? "Drag the dial to aim the fan. Use presets to widen or collapse the cone." : "This card is still resolving the related Dyson device and companion entities from the selected fan entity."}
               </div>
             </div>
 
             <div class="preset-row">
               ${presetWidths.map((preset) => `
-                <button class="preset ${width === preset ? "selected" : ""}" data-width="${preset}">
+                <button class="preset ${bounds.width === preset ? "selected" : ""}" data-width="${preset}">
                   ${preset === 0 ? "Direct" : `${preset}\u00b0`}
                 </button>
               `).join("")}
