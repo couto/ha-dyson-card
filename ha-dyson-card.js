@@ -859,9 +859,28 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-core-label {
           fill: var(--primary-text-color);
-          font: 700 16px system-ui, sans-serif;
+          font: 700 15px system-ui, sans-serif;
           letter-spacing: 0.08em;
           text-transform: uppercase;
+        }
+        .wheel-core-status {
+          fill: var(--secondary-text-color);
+          font: 600 10px system-ui, sans-serif;
+          letter-spacing: 0.02em;
+        }
+        .wheel-spinner {
+          fill: none;
+          stroke: var(--primary-color, #4f46e5);
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-dasharray: 18 34;
+          transform-origin: 160px 160px;
+          animation: dyson-spin 0.9s linear infinite;
+        }
+        @keyframes dyson-spin {
+          to {
+            transform: rotate(360deg);
+          }
         }
         .direction-readout {
           display: grid;
@@ -980,7 +999,9 @@ class HaDysonCard extends HTMLElement {
                 <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
                 <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
                 <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
-                <text class="wheel-core-label" x="160" y="166" text-anchor="middle">Dyson</text>
+                ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
+                <text class="wheel-core-label" x="160" y="${operationActive ? "158" : "166"}" text-anchor="middle">Dyson</text>
+                ${operationActive ? `<text class="wheel-core-status" x="160" y="177" text-anchor="middle">${operationLabel}</text>` : ""}
                 <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
               </svg>
             </button>
