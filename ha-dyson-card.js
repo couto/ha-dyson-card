@@ -42,6 +42,12 @@ class HaDysonCard extends HTMLElement {
             },
           },
         },
+        {
+          name: "show_debug",
+          selector: {
+            boolean: {},
+          },
+        },
       ],
       computeLabel: (schema) => {
         switch (schema.name) {
@@ -51,6 +57,8 @@ class HaDysonCard extends HTMLElement {
             return "Title";
           case "default_oscillation_angle":
             return "Default oscillation width";
+          case "show_debug":
+            return "Show live debug";
           default:
             return undefined;
         }
@@ -59,6 +67,8 @@ class HaDysonCard extends HTMLElement {
         switch (schema.name) {
           case "default_oscillation_angle":
             return "Used when current sweep width cannot be derived from the Dyson device.";
+          case "show_debug":
+            return "Shows live Dyson entity state and attributes for testing.";
           default:
             return undefined;
         }
@@ -90,6 +100,7 @@ class HaDysonCard extends HTMLElement {
     this._config = {
       title: "",
       default_oscillation_angle: 90,
+      show_debug: true,
       ...config,
     };
     this._derived = null;
@@ -145,11 +156,19 @@ class HaDysonCard extends HTMLElement {
       temperatureEntity: this._findEntityByHints(sameDevice, "sensor", ["temperature"]),
       humidityEntity: this._findEntityByHints(sameDevice, "sensor", ["humidity"]),
       airQualityEntity: this._findEntityByHints(sameDevice, "sensor", ["air_quality_category", "air_quality", "aqi", "pm25", "pm2_5", "pm10", "no2", "voc"]),
+      vocEntity: this._findEntityByHints(sameDevice, "sensor", ["voc"]),
+      hepaFilterEntity: this._findEntityByHints(sameDevice, "sensor", ["hepa_filter_life", "hepa filter life"]),
+      carbonFilterEntity: this._findEntityByHints(sameDevice, "sensor", ["carbon_filter_life", "carbon filter life"]),
+      nightModeEntity: this._findEntityByExactName(sameDevice, "switch", ["Night Mode"]),
       oscillationSelectEntity: this._findEntityByExactName(sameDevice, "select", ["Oscillation"]),
       oscillationLowEntity: this._findEntityByExactName(sameDevice, "number", ["Oscillation Low Angle"]),
       oscillationHighEntity: this._findEntityByExactName(sameDevice, "number", ["Oscillation High Angle"]),
       oscillationCenterEntity: this._findEntityByExactName(sameDevice, "number", ["Oscillation Center Angle"]),
       oscillationSpanEntity: this._findEntityByExactName(sameDevice, "number", ["Oscillation Angle"]),
+      relatedEntities: sameDevice
+        .map((entry) => entry.entity_id)
+        .filter(Boolean)
+        .sort(),
     };
   }
 
@@ -225,6 +244,21 @@ class HaDysonCard extends HTMLElement {
 
   _oscillationCenterEntity() {
     return this._derived?.oscillationCenterEntity || "";
+  }
+
+  _nightModeEntity() {
+    return this._derived?.nightModeEntity || "";
+  }
+
+  _vocEntity() {
+    return this._derived?.vocEntity || this._airQualityEntity();
+  }
+
+  _filterEntities() {
+    return [
+      this._derived?.hepaFilterEntity || "",
+      this._derived?.carbonFilterEntity || "",
+    ].filter(Boolean);
   }
 
   _normalizeAngle(value) {
