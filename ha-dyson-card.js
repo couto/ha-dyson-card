@@ -1752,9 +1752,9 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-speed {
           position: absolute;
-          right: 28px;
-          top: 54px;
-          bottom: 54px;
+          right: 14px;
+          top: 52px;
+          bottom: 40px;
           display: grid;
           grid-template-rows: auto minmax(0, 1fr) auto;
           justify-items: center;
@@ -1770,12 +1770,47 @@ class HaDysonCard extends HTMLElement {
           color: var(--primary-color, #4f46e5);
         }
         .speed-slider {
-          width: 36px;
-          height: 116px;
+          width: 42px;
+          height: 146px;
           accent-color: var(--primary-color, #4f46e5);
           writing-mode: vertical-lr;
           direction: rtl;
           touch-action: none;
+          appearance: none;
+          background: transparent;
+        }
+        .speed-slider::-webkit-slider-runnable-track {
+          width: 42px;
+          height: 146px;
+          background: transparent;
+          border: 0;
+        }
+        .speed-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 28px;
+          height: 44px;
+          border: 0;
+          border-radius: 999px;
+          background: var(--primary-color, #4f46e5);
+          box-shadow:
+            0 2px 8px color-mix(in srgb, #000 24%, transparent),
+            inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
+        }
+        .speed-slider::-moz-range-track {
+          width: 42px;
+          height: 146px;
+          background: transparent;
+          border: 0;
+        }
+        .speed-slider::-moz-range-thumb {
+          width: 28px;
+          height: 44px;
+          border: 0;
+          border-radius: 999px;
+          background: var(--primary-color, #4f46e5);
+          box-shadow:
+            0 2px 8px color-mix(in srgb, #000 24%, transparent),
+            inset 0 1px 0 color-mix(in srgb, white 24%, transparent);
         }
         .timer-flyout {
           position: absolute;
@@ -1844,10 +1879,9 @@ class HaDysonCard extends HTMLElement {
           left: 2px;
           top: 16px;
           display: grid;
-          grid-template-columns: repeat(2, auto);
+          grid-template-columns: auto;
           align-items: center;
           justify-items: start;
-          column-gap: 7px;
           row-gap: 5px;
           padding: 7px 8px;
           border-radius: 14px;
