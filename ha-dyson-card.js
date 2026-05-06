@@ -2143,9 +2143,11 @@ class HaDysonCard extends HTMLElement {
           width: 100%;
           height: 100%;
           border-radius: 999px;
-          background: transparent;
-          border: 0;
-          box-shadow: none;
+          background: color-mix(in srgb, var(--dyson-raised-bg) 72%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+            0 4px 10px color-mix(in srgb, #000 8%, transparent);
           --sweep-start: 0deg;
           --sweep-size: 72deg;
         }
@@ -2169,11 +2171,16 @@ class HaDysonCard extends HTMLElement {
           position: absolute;
           inset: 4px;
           border-radius: 999px;
-          border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
           background:
+            conic-gradient(
+              from var(--sweep-start),
+              color-mix(in srgb, var(--primary-color, #03a9f4) 13%, transparent) 0 var(--sweep-size),
+              transparent var(--sweep-size) 360deg
+            ),
             repeating-conic-gradient(
               from -36deg,
-              color-mix(in srgb, var(--primary-text-color) 10%, transparent) 0 1deg,
+              color-mix(in srgb, var(--primary-text-color) 9%, transparent) 0 1deg,
               transparent 1deg 72deg
             );
           box-shadow: none;
@@ -2207,9 +2214,9 @@ class HaDysonCard extends HTMLElement {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 999px;
-          background: color-mix(in srgb, var(--card-background-color, #fff) 96%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
         }
         .sweep-dial-option--0 {
           left: 50%;
@@ -2232,9 +2239,10 @@ class HaDysonCard extends HTMLElement {
           top: 38%;
         }
         .sweep-dial-option.active span {
-          background: var(--dyson-active-bg);
-          color: var(--primary-text-color);
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #03a9f4) 24%, transparent);
+          background: transparent;
+          color: var(--primary-color, #03a9f4);
+          box-shadow: none;
+          text-shadow: 0 0 10px color-mix(in srgb, var(--primary-color, #03a9f4) 24%, transparent);
         }
         .operation-status {
           min-height: 20px;
