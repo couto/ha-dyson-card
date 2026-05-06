@@ -730,8 +730,8 @@ class HaDysonCard extends HTMLElement {
       handleCircle.setAttribute("cy", String(handle.y));
     }
     if (handleHit) {
-      handleHit.style.left = `calc(50% - 146px + ${(handle.x / 320) * 292}px)`;
-      handleHit.style.top = `${(handle.y / 320) * 292}px`;
+      handleHit.style.left = `${((handle.x / 320) * 100).toFixed(4)}%`;
+      handleHit.style.top = `${((handle.y / 320) * 100).toFixed(4)}%`;
     }
 
     if (bounds.width === 0) {
@@ -2035,9 +2035,19 @@ class HaDysonCard extends HTMLElement {
           justify-items: center;
         }
         .wheel-wrap {
+          --dyson-speed-gutter: 52px;
+          --dyson-wheel-size: min(calc(100% - var(--dyson-speed-gutter)), 304px);
+          --dyson-wheel-offset: 14px;
           position: relative;
           width: 100%;
-          height: 304px;
+          height: auto;
+        }
+        .wheel-stage {
+          position: relative;
+          width: var(--dyson-wheel-size);
+          height: auto;
+          aspect-ratio: 1 / 1;
+          margin: var(--dyson-wheel-offset) var(--dyson-speed-gutter) 0 0;
         }
         .wheel-button {
           appearance: none;
@@ -2045,8 +2055,8 @@ class HaDysonCard extends HTMLElement {
           padding: 0;
           background: none;
           cursor: default;
-          width: min(100%, 304px);
-          margin: 14px auto 0;
+          width: 100%;
+          margin: 0;
           touch-action: pan-y;
           display: block;
         }
@@ -2091,8 +2101,8 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-handle-hit {
           position: absolute;
-          left: calc(50% - 152px + ${(handle.x / 320) * 304}px);
-          top: calc(14px + ${(handle.y / 320) * 304}px);
+          left: ${((handle.x / 320) * 100).toFixed(4)}%;
+          top: ${((handle.y / 320) * 100).toFixed(4)}%;
           width: 52px;
           height: 52px;
           transform: translate(-50%, -50%);
@@ -2108,9 +2118,9 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-speed {
           position: absolute;
-          right: 1px;
-          top: 60px;
-          bottom: 10px;
+          right: 0;
+          top: calc(var(--dyson-wheel-offset) + 46px);
+          bottom: 0;
           display: grid;
           grid-template-rows: minmax(0, 1fr) auto auto;
           justify-items: center;
@@ -2467,7 +2477,7 @@ class HaDysonCard extends HTMLElement {
         .wheel-center-info {
           position: absolute;
           left: 50%;
-          top: calc(50% + 14px);
+          top: 50%;
           transform: translate(-50%, -50%);
           width: 152px;
           height: 152px;
@@ -3029,21 +3039,28 @@ class HaDysonCard extends HTMLElement {
 
           <div class="control-shell">
             <div class="wheel-wrap">
-              <button class="wheel-button" aria-label="Set Dyson direction">
-                <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
-                  <path class="wheel-bg" d="${travelPath}"></path>
-                  <path class="wheel-ring" d="${travelRingPath}"></path>
-                  <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
-                  <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
-                  <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
-                  <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
-                  <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
-                  <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
-                  ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
-                  <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
-                </svg>
-              </button>
-              <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
+              <div class="wheel-stage">
+                <button class="wheel-button" aria-label="Set Dyson direction">
+                  <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
+                    <path class="wheel-bg" d="${travelPath}"></path>
+                    <path class="wheel-ring" d="${travelRingPath}"></path>
+                    <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
+                    <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
+                    <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
+                    <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
+                    <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
+                    <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
+                    ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
+                    <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
+                  </svg>
+                </button>
+                <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
+                <div class="wheel-center-info">
+                  <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
+                    ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
+                  </div>
+                </div>
+              </div>
               <div class="wheel-speed">
                 <div class="speed-control" style="--speed-fill: ${speedPercent}%;">
                   <div class="speed-rail" aria-hidden="true"></div>
@@ -3066,11 +3083,6 @@ class HaDysonCard extends HTMLElement {
                   </button>
                 ` : ""}
                 ${this._renderSensorDetails()}
-              </div>
-              <div class="wheel-center-info">
-                <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
-                  ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
-                </div>
               </div>
             </div>
 
