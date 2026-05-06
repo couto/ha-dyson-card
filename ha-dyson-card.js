@@ -126,10 +126,13 @@ class HaDysonCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const preserveEditorFocus = this._presetEditorHasFocus();
     this._hass = hass;
     this._ensureDerived();
     this._reconcilePendingState();
-    this._render();
+    if (!preserveEditorFocus) {
+      this._render();
+    }
   }
 
   getCardSize() {
@@ -153,10 +156,18 @@ class HaDysonCard extends HTMLElement {
       const registry = await this._ensureRegistryCache();
       if (!registry) return;
       this._derived = this._deriveFromRegistry(registry);
-      this._render();
+      if (!this._presetEditorHasFocus()) {
+        this._render();
+      }
     } catch (_error) {
       // Keep the card usable even if registry queries fail.
     }
+  }
+
+  _presetEditorHasFocus() {
+    const active = this.shadowRoot?.activeElement;
+    const editor = this.shadowRoot?.querySelector(".preset-editor");
+    return Boolean(this._presetEditorOpen && active && editor?.contains(active));
   }
 
   _deriveFromRegistry(registry) {
@@ -1769,6 +1780,7 @@ class HaDysonCard extends HTMLElement {
     const temp = this._stateValue(this._temperatureEntity(), "");
     const humidity = this._stateValue(this._humidityEntity(), "");
     const aqi = this._sensorDetailItem("AQI", ["aqi", "air_quality", "air quality"])?.value || "";
+    const aqiTone = aqi ? this._qualityTone(this._qualityLabel(aqi)) : "neutral";
     const speedPercent = this._currentSpeed(attributes);
     const filterPercent = this._filterPercent();
     const timerLabel = this._timerLabel(attributes);
@@ -2360,6 +2372,21 @@ class HaDysonCard extends HTMLElement {
         }
         .sensor-temp ha-icon {
           color: var(--primary-color, #4f46e5);
+        }
+        .sensor-aqi.good {
+          border-color: color-mix(in srgb, #22c55e 46%, transparent);
+          background: color-mix(in srgb, #22c55e 18%, var(--dyson-raised-bg));
+          color: var(--primary-text-color);
+        }
+        .sensor-aqi.fair {
+          border-color: color-mix(in srgb, #f59e0b 50%, transparent);
+          background: color-mix(in srgb, #f59e0b 18%, var(--dyson-raised-bg));
+          color: var(--primary-text-color);
+        }
+        .sensor-aqi.poor {
+          border-color: color-mix(in srgb, #ef4444 52%, transparent);
+          background: color-mix(in srgb, #ef4444 20%, var(--dyson-raised-bg));
+          color: var(--primary-text-color);
         }
         .sensor-temp ha-icon,
         .sensor-humidity ha-icon,
@@ -3030,7 +3057,7 @@ class HaDysonCard extends HTMLElement {
               <div class="wheel-sensor-strip ${this._sensorDetailsOpen ? "expanded" : ""}">
                 <span class="sensor-temp"><ha-icon icon="mdi:thermometer"></ha-icon>${this._escapeHtml(temp || "—")}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), "\u00b0")) : ""}</span>
                 <span class="sensor-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
-                <span class="sensor-aqi"><ha-icon icon="mdi:gauge"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
+                <span class="sensor-aqi ${aqiTone}"><ha-icon icon="mdi:gauge"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
                 <span class="sensor-filter"><ha-icon icon="mdi:air-filter"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
                 ${sensorDetailGroups.length ? `
                   <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}">
