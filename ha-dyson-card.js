@@ -428,6 +428,10 @@ class HaDysonCard extends HTMLElement {
   }
 
   _sourceWidth(attributes) {
+    const fromSelect = this._selectSweepWidth();
+    if (fromSelect !== null) {
+      return fromSelect;
+    }
     if (this._oscillationEnabled(attributes) === false) {
       return 0;
     }
@@ -867,6 +871,9 @@ class HaDysonCard extends HTMLElement {
               <button class="direction-preset-remove" data-preset-remove="${this._escapeHtml(preset.id)}" aria-label="Remove ${this._escapeHtml(preset.name)}">×</button>
             </div>
           `).join("") : `<span class="direction-presets-empty">No snapshots saved</span>`}
+          <button class="direction-preset-add" data-preset-add aria-label="Save current direction, sweep, and airflow speed" ${disabled}>
+            <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
+          </button>
         </div>
         ${editor}
       </div>
@@ -1336,19 +1343,64 @@ class HaDysonCard extends HTMLElement {
       await this._setNightMode(!this._nightModeOn(attributes));
     });
 
+    const speedControl = this.shadowRoot?.querySelector(".speed-control");
     const speedSlider = this.shadowRoot?.querySelector(".speed-slider");
-    speedSlider?.addEventListener("input", (event) => {
-      const nextSpeed = Math.max(0, Math.min(100, Math.round(Number(event.target.value))));
+    const updateSpeedPreview = (nextSpeed) => {
       this._setPendingSpeed(nextSpeed);
+      if (speedSlider) {
+        speedSlider.value = String(nextSpeed);
+      }
       this.shadowRoot?.querySelectorAll(".speed-control").forEach((node) => {
         node.style.setProperty("--speed-fill", `${nextSpeed}%`);
       });
       this.shadowRoot?.querySelectorAll(".speed-value").forEach((node) => {
         node.textContent = `${nextSpeed}%`;
       });
+    };
+    const speedFromPointer = (event) => {
+      const rect = speedControl?.getBoundingClientRect();
+      if (!rect?.height) return this._currentSpeed(attributes);
+      const raw = 100 - (((event.clientY - rect.top) / rect.height) * 100);
+      return this._clamp(Math.round(raw / 10) * 10, 0, 100);
+    };
+    let speedDragging = false;
+    speedControl?.addEventListener("pointerdown", (event) => {
+      if (!this._supportsFanSpeed(attributes)) return;
+      event.preventDefault();
+      speedDragging = true;
+      try {
+        speedControl.setPointerCapture?.(event.pointerId);
+      } catch (_error) {
+        // Synthetic/test pointer events may not have an active capture target.
+      }
+      updateSpeedPreview(speedFromPointer(event));
+    });
+    speedControl?.addEventListener("pointermove", (event) => {
+      if (!speedDragging) return;
+      event.preventDefault();
+      updateSpeedPreview(speedFromPointer(event));
+    });
+    speedControl?.addEventListener("pointerup", async (event) => {
+      if (!speedDragging) return;
+      event.preventDefault();
+      speedDragging = false;
+      try {
+        speedControl.releasePointerCapture?.(event.pointerId);
+      } catch (_error) {
+        // Ignore capture release failures from synthetic/test pointer events.
+      }
+      const nextSpeed = speedFromPointer(event);
+      updateSpeedPreview(nextSpeed);
+      await this._setFanSpeed(nextSpeed);
+    });
+    speedControl?.addEventListener("pointercancel", () => {
+      speedDragging = false;
+      this._clearPendingSpeed();
     });
     speedSlider?.addEventListener("change", async (event) => {
-      await this._setFanSpeed(event.target.value);
+      const nextSpeed = this._clamp(Math.round(Number(event.target.value) / 10) * 10, 0, 100);
+      updateSpeedPreview(nextSpeed);
+      await this._setFanSpeed(nextSpeed);
     });
 
     this.shadowRoot?.querySelectorAll("[data-direction]")?.forEach((button) => {
@@ -1578,6 +1630,9 @@ class HaDysonCard extends HTMLElement {
           --dyson-active-bg: color-mix(in srgb, var(--primary-color, #4f46e5) 16%, var(--card-background-color, #fff));
           --dyson-control-bg: color-mix(in srgb, var(--card-background-color, #fff) 92%, #000 8%);
           --dyson-inset-bg: color-mix(in srgb, var(--card-background-color, #fff) 84%, #000 16%);
+          --dyson-panel-surface: color-mix(in srgb, var(--dyson-panel-bg) 72%, transparent);
+          --dyson-wheel-bg: color-mix(in srgb, var(--card-background-color, #ffffff) 78%, var(--primary-text-color) 22%);
+          --dyson-cone-bg: color-mix(in srgb, var(--primary-color, #4f46e5) 22%, transparent);
           --dyson-border: var(--divider-color);
           --dyson-soft-border: color-mix(in srgb, var(--divider-color) 72%, transparent);
           --dyson-shadow: 0 4px 12px color-mix(in srgb, #000 16%, transparent);
@@ -1585,20 +1640,24 @@ class HaDysonCard extends HTMLElement {
           padding: 12px;
           border-radius: 18px;
           overflow: hidden;
+          color: var(--primary-text-color);
         }
         @media (prefers-color-scheme: dark) {
           ha-card {
-            --dyson-panel-bg: color-mix(in srgb, var(--card-background-color, #111) 82%, var(--primary-text-color) 6%, #000 12%);
-            --dyson-field-bg: color-mix(in srgb, var(--card-background-color, #111) 78%, var(--primary-text-color) 8%, #000 14%);
-            --dyson-raised-bg: color-mix(in srgb, var(--card-background-color, #111) 76%, var(--primary-text-color) 7%, #000 17%);
-            --dyson-pill-bg: color-mix(in srgb, var(--card-background-color, #111) 74%, var(--primary-text-color) 9%, #000 17%);
-            --dyson-active-bg: color-mix(in srgb, var(--primary-color, #4f46e5) 18%, var(--card-background-color, #111));
-            --dyson-control-bg: color-mix(in srgb, var(--card-background-color, #111) 74%, var(--primary-text-color) 7%, #000 19%);
-            --dyson-inset-bg: color-mix(in srgb, var(--card-background-color, #111) 68%, #000 24%, var(--primary-text-color) 8%);
-            --dyson-border: color-mix(in srgb, var(--divider-color) 78%, var(--primary-text-color) 12%);
-            --dyson-soft-border: color-mix(in srgb, var(--divider-color) 70%, var(--primary-text-color) 10%, transparent);
-            --dyson-shadow: 0 8px 18px color-mix(in srgb, #000 32%, transparent);
-            --dyson-inner-highlight: inset 0 1px 0 color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+            --dyson-panel-bg: #242b33;
+            --dyson-field-bg: #1b222a;
+            --dyson-raised-bg: #2b333d;
+            --dyson-pill-bg: #28323c;
+            --dyson-active-bg: #123f56;
+            --dyson-control-bg: #202832;
+            --dyson-inset-bg: #171d24;
+            --dyson-panel-surface: var(--dyson-panel-bg);
+            --dyson-wheel-bg: #505861;
+            --dyson-cone-bg: rgba(3, 169, 244, 0.25);
+            --dyson-border: rgba(255, 255, 255, 0.23);
+            --dyson-soft-border: rgba(255, 255, 255, 0.13);
+            --dyson-shadow: 0 8px 18px color-mix(in srgb, #000 34%, transparent);
+            --dyson-inner-highlight: inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
           }
         }
         .card {
@@ -1619,7 +1678,7 @@ class HaDysonCard extends HTMLElement {
           border: 1px solid var(--dyson-soft-border);
           border-radius: 18px;
           padding: 8px;
-          background: color-mix(in srgb, var(--dyson-panel-bg) 72%, transparent);
+          background: var(--dyson-panel-surface);
         }
         .control-grid {
           display: grid;
@@ -1793,7 +1852,7 @@ class HaDysonCard extends HTMLElement {
           display: block;
         }
         .wheel-bg {
-          fill: color-mix(in srgb, var(--card-background-color, #ffffff) 78%, #000 22%);
+          fill: var(--dyson-wheel-bg);
           pointer-events: none;
         }
         .wheel-ring {
@@ -1809,7 +1868,7 @@ class HaDysonCard extends HTMLElement {
           pointer-events: none;
         }
         .wheel-cone {
-          fill: color-mix(in srgb, var(--primary-color, #4f46e5) 22%, transparent);
+          fill: var(--dyson-cone-bg);
           pointer-events: none;
         }
         .wheel-direct {
@@ -1911,6 +1970,8 @@ class HaDysonCard extends HTMLElement {
           touch-action: none;
           appearance: none;
           background: transparent;
+          opacity: 0;
+          pointer-events: none;
           cursor: pointer;
         }
         .speed-slider::-webkit-slider-runnable-track {
@@ -1921,8 +1982,8 @@ class HaDysonCard extends HTMLElement {
         }
         .speed-slider::-webkit-slider-thumb {
           appearance: none;
-          width: 38px;
-          height: 196px;
+          width: 1px;
+          height: 1px;
           border: 0;
           border-radius: 0;
           background: transparent;
@@ -1935,8 +1996,8 @@ class HaDysonCard extends HTMLElement {
           border: 0;
         }
         .speed-slider::-moz-range-thumb {
-          width: 38px;
-          height: 196px;
+          width: 1px;
+          height: 1px;
           border: 0;
           border-radius: 0;
           background: transparent;
@@ -2000,7 +2061,7 @@ class HaDysonCard extends HTMLElement {
           stroke-linecap: round;
           stroke-dasharray: 18 34;
           transform-origin: 160px 160px;
-          animation: dyson-spin 0.9s linear infinite;
+          animation: dyson-spin 1.6s linear infinite;
         }
         @keyframes dyson-spin {
           to {
@@ -2071,8 +2132,8 @@ class HaDysonCard extends HTMLElement {
           left: 50%;
           top: 50%;
           transform: translate(-50%, -50%);
-          width: 132px;
-          height: 132px;
+          width: 152px;
+          height: 152px;
           pointer-events: auto;
           color: var(--primary-text-color);
           z-index: 3;
@@ -2106,10 +2167,15 @@ class HaDysonCard extends HTMLElement {
         .sweep-dial::before {
           content: "";
           position: absolute;
-          inset: 17px;
+          inset: 4px;
           border-radius: 999px;
           border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
-          background: transparent;
+          background:
+            repeating-conic-gradient(
+              from -36deg,
+              color-mix(in srgb, var(--primary-text-color) 10%, transparent) 0 1deg,
+              transparent 1deg 72deg
+            );
           box-shadow: none;
         }
         .sweep-dial-option,
@@ -2125,8 +2191,8 @@ class HaDysonCard extends HTMLElement {
           line-height: 1;
         }
         .sweep-dial-option {
-          width: 34px;
-          height: 34px;
+          width: 44px;
+          height: 44px;
           padding: 0;
           transform: translate(-50%, -50%);
           z-index: 1;
@@ -2135,9 +2201,9 @@ class HaDysonCard extends HTMLElement {
           justify-content: center;
         }
         .sweep-dial-option span {
-          min-width: 25px;
-          height: 22px;
-          padding: 0 4px;
+          min-width: 34px;
+          height: 30px;
+          padding: 0 6px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -2147,56 +2213,42 @@ class HaDysonCard extends HTMLElement {
         }
         .sweep-dial-option--0 {
           left: 50%;
-          top: 14%;
+          top: 16%;
         }
         .sweep-dial-option--45 {
-          left: 84.5%;
-          top: 39%;
+          left: 77%;
+          top: 38%;
         }
         .sweep-dial-option--90 {
-          left: 71%;
-          top: 81.5%;
+          left: 67%;
+          top: 74%;
         }
         .sweep-dial-option--180 {
-          left: 29%;
-          top: 81.5%;
+          left: 33%;
+          top: 74%;
         }
         .sweep-dial-option--350 {
-          left: 15.5%;
-          top: 39%;
+          left: 23%;
+          top: 38%;
         }
         .sweep-dial-option.active span {
           background: var(--dyson-active-bg);
           color: var(--primary-text-color);
           box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #03a9f4) 24%, transparent);
         }
-        .snapshot-button.active {
-          background: var(--dyson-active-bg);
-          color: var(--primary-text-color);
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #03a9f4) 18%, transparent);
-        }
-        .snapshot-button {
-          left: 50%;
-          top: 50%;
-          width: 42px;
-          height: 42px;
-          transform: translate(-50%, -50%);
+        .operation-status {
+          min-height: 20px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid var(--dyson-soft-border);
-          background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
-          box-shadow: none;
-          z-index: 2;
-        }
-        .snapshot-button ha-icon {
-          --mdc-icon-size: 18px;
-        }
-        .center-operation {
+          width: min(100%, 292px);
+          margin: -3px auto 1px;
+          padding: 3px 10px;
+          border-radius: 999px;
+          background: ${operationActive ? "color-mix(in srgb, var(--primary-color, #03a9f4) 10%, transparent)" : "transparent"};
           color: var(--secondary-text-color);
-          font-size: 0.56rem;
-          font-weight: 700;
-          max-width: 72px;
+          font-size: 0.62rem;
+          font-weight: 760;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -2518,23 +2570,20 @@ class HaDysonCard extends HTMLElement {
           .speed-control,
           .speed-slider,
           .speed-slider::-webkit-slider-runnable-track,
-          .speed-slider::-webkit-slider-thumb,
-          .speed-slider::-moz-range-track,
-          .speed-slider::-moz-range-thumb {
+          .speed-slider::-moz-range-track {
             width: 34px;
           }
           .speed-rail {
             inset-inline: 4px;
           }
           .wheel-center-info {
-            width: 126px;
-            height: 126px;
+            width: 146px;
+            height: 146px;
           }
           .sweep-dial-option {
-            width: 31px;
-            height: 31px;
+            width: 40px;
+            height: 40px;
             font-size: 0.54rem;
-            padding: 0 3px;
           }
           .timer-custom {
             grid-template-columns: 1fr 1fr;
@@ -2638,12 +2687,12 @@ class HaDysonCard extends HTMLElement {
               <div class="wheel-center-info">
                 <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
                   ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
-                  <button class="snapshot-button ${this._presetEditorOpen ? "active" : ""}" data-preset-add aria-label="Save current direction, sweep, and airflow speed" ${controlReady ? "" : "disabled"}>
-                    <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
-                  </button>
                 </div>
-                ${operationActive ? `<div class="center-operation">${this._escapeHtml(operationLabel)}</div>` : ""}
               </div>
+            </div>
+
+            <div class="operation-status" aria-live="polite">
+              ${operationActive ? this._escapeHtml(operationLabel) : ""}
             </div>
 
             <div class="mode-row">
