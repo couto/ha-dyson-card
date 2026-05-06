@@ -101,6 +101,7 @@ class HaDysonCard extends HTMLElement {
     this._timerMenuOpen = false;
     this._customTimerOpen = false;
     this._presetEditorOpen = false;
+    this._sensorDetailsOpen = false;
   }
 
   setConfig(config) {
@@ -117,6 +118,7 @@ class HaDysonCard extends HTMLElement {
     this._timerMenuOpen = false;
     this._customTimerOpen = false;
     this._presetEditorOpen = false;
+    this._sensorDetailsOpen = false;
     this._clearPending(false);
     this._clearPendingSpeed(false);
     this._clearOptimisticDirection(false);
@@ -217,6 +219,21 @@ class HaDysonCard extends HTMLElement {
       })
       .find(Boolean);
     return byOriginalName?.entity_id || "";
+  }
+
+  _findRelatedEntitiesByHints(domain, hints) {
+    const normalizedHints = hints.map((hint) => String(hint).toLowerCase());
+    const related = this._derived?.relatedEntities || [];
+    return related.filter((entityId) => {
+      if (!entityId?.startsWith(`${domain}.`)) return false;
+      const stateObj = this._stateObj(entityId);
+      const haystack = [
+        entityId,
+        stateObj?.attributes?.friendly_name || "",
+      ].join(" ").toLowerCase();
+      return normalizedHints.some((hint) => haystack.includes(hint.replaceAll("_", " "))) ||
+        normalizedHints.some((hint) => haystack.includes(hint));
+    });
   }
 
   _stateObj(entityId) {
@@ -751,6 +768,107 @@ class HaDysonCard extends HTMLElement {
 
   _unit(entityId, fallback = "") {
     return this._stateObj(entityId)?.attributes?.unit_of_measurement || fallback;
+  }
+
+  _sensorDetailValue(entityId) {
+    const stateObj = this._stateObj(entityId);
+    if (!stateObj || ["unknown", "unavailable"].includes(stateObj.state)) return null;
+    const unit = stateObj.attributes?.unit_of_measurement || "";
+    return `${stateObj.state}${unit}`;
+  }
+
+  _sensorDetailItem(label, hints, domain = "sensor") {
+    const entityId = this._findRelatedEntitiesByHints(domain, hints)[0];
+    const value = this._sensorDetailValue(entityId);
+    if (!entityId || !value) return null;
+    return { label, value, entityId };
+  }
+
+  _sensorDetailGroups() {
+    const groups = [
+      {
+        title: "Air Quality",
+        icon: "mdi:air-filter",
+        items: [
+          this._sensorDetailItem("AQI", ["aqi", "air_quality", "air quality"]),
+          this._sensorDetailItem("PM2.5", ["pm25", "pm2_5", "p25r", "pm2.5"]),
+          this._sensorDetailItem("PM10", ["pm10", "p10r"]),
+          this._sensorDetailItem("VOC", ["voc", "vact", "va10"]),
+          this._sensorDetailItem("NO2", ["no2", "nox", "noxl"]),
+          this._sensorDetailItem("CO2", ["co2", "co2r"]),
+          this._sensorDetailItem("HCHO", ["hcho", "formaldehyde"]),
+          this._sensorDetailItem("Dominant", ["dominant_pollutant", "dominant pollutant"]),
+        ],
+      },
+      {
+        title: "Environment",
+        icon: "mdi:home-thermometer",
+        items: [
+          this._sensorDetailItem("Temperature", ["temperature"]),
+          this._sensorDetailItem("Humidity", ["humidity"]),
+        ],
+      },
+      {
+        title: "Filter",
+        icon: "mdi:air-filter",
+        items: [
+          this._sensorDetailItem("HEPA Life", ["hepa_filter_life", "hepa filter life"]),
+          this._sensorDetailItem("Carbon Life", ["carbon_filter_life", "carbon filter life"]),
+          this._sensorDetailItem("Status", ["filter_status", "filter status"]),
+          this._sensorDetailItem("HEPA Type", ["hepa_filter_type", "hepa filter type"]),
+          this._sensorDetailItem("Carbon Type", ["carbon_filter_type", "carbon filter type"]),
+          this._sensorDetailItem("Replacement", ["filter_replacement", "filter replacement"], "binary_sensor"),
+        ],
+      },
+      {
+        title: "Device",
+        icon: "mdi:wifi",
+        items: [
+          this._sensorDetailItem("Connection", ["connection_status", "connection status"]),
+          this._sensorDetailItem("Wi-Fi", ["wifi", "wi-fi", "signal"]),
+          this._sensorDetailItem("Firmware", ["firmware"], "update"),
+          this._sensorDetailItem("Auto Update", ["firmware_auto_update", "firmware auto update"], "switch"),
+          this._sensorDetailItem("Monitoring", ["continuous_monitoring", "continuous monitoring"], "switch"),
+          this._sensorDetailItem("Fault", ["fault"], "binary_sensor"),
+        ],
+      },
+    ];
+
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items
+          .filter(Boolean)
+          .filter((item, index, items) =>
+            items.findIndex((candidate) => candidate.entityId === item.entityId) === index
+          ),
+      }))
+      .filter((group) => group.items.length);
+  }
+
+  _renderSensorDetails() {
+    const groups = this._sensorDetailGroups();
+    if (!this._sensorDetailsOpen || !groups.length) return "";
+    return `
+      <div class="sensor-details-panel">
+        ${groups.map((group) => `
+          <section class="sensor-details-section">
+            <div class="sensor-details-heading">
+              <ha-icon icon="${this._escapeHtml(group.icon)}"></ha-icon>
+              <span>${this._escapeHtml(group.title)}</span>
+            </div>
+            <div class="sensor-details-grid">
+              ${group.items.map((item) => `
+                <div class="sensor-detail-item" title="${this._escapeHtml(item.entityId)}">
+                  <span>${this._escapeHtml(item.label)}</span>
+                  <strong>${this._escapeHtml(item.value)}</strong>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+        `).join("")}
+      </div>
+    `;
   }
 
   _qualityLabel(airQualityValue) {
@@ -1572,6 +1690,12 @@ class HaDysonCard extends HTMLElement {
         await this._setSweepWidth(Number(button.dataset.sweepWidth), attributes);
       });
     });
+
+    this.shadowRoot?.querySelector("[data-sensor-more]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this._sensorDetailsOpen = !this._sensorDetailsOpen;
+      this._render();
+    });
   }
 
   async _setSweepWidth(width, attributes) {
@@ -1671,6 +1795,7 @@ class HaDysonCard extends HTMLElement {
     const speedAvailable = this._supportsFanSpeed(attributes);
     const direction = this._currentDirection(attributes);
     const width = this._currentWidth(attributes);
+    const sensorDetailGroups = this._sensorDetailGroups();
     const bounds = this._boundsFromCenterWidth(direction, width);
     const visualCenter = this._visualAngleFromDevice(bounds.center);
     const handle = this._pointForAngle(160, 160, 120, visualCenter);
@@ -2162,12 +2287,36 @@ class HaDysonCard extends HTMLElement {
           border-radius: 14px;
           background: var(--dyson-raised-bg);
           border: 1px solid var(--dyson-soft-border);
-          pointer-events: none;
+          pointer-events: auto;
           color: var(--secondary-text-color);
           font-size: 0.6rem;
           font-weight: 760;
           line-height: 1;
           z-index: 1;
+        }
+        .sensor-more-button {
+          pointer-events: auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          min-height: 20px;
+          padding: 3px 6px;
+          border: 1px solid var(--dyson-soft-border);
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--primary-color, #03a9f4) 9%, var(--dyson-pill-bg));
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 0.55rem;
+          line-height: 1;
+        }
+        .sensor-more-button ha-icon {
+          --mdc-icon-size: 10px;
+        }
+        .sensor-more-button.active {
+          border-color: transparent;
+          background: var(--dyson-active-bg);
+          color: var(--primary-color, #03a9f4);
         }
         .wheel-sensor-strip ha-icon {
           --mdc-icon-size: 12px;
@@ -2182,6 +2331,7 @@ class HaDysonCard extends HTMLElement {
           justify-content: start;
           gap: 3px;
           min-width: 0;
+          pointer-events: none;
         }
         .sensor-temp ha-icon {
           color: var(--primary-color, #4f46e5);
@@ -2207,6 +2357,65 @@ class HaDysonCard extends HTMLElement {
         }
         .sensor-voc.poor .voc-dot {
           background: #ef4444;
+        }
+        .sensor-details-panel {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--dyson-border);
+          border-radius: 16px;
+          background: var(--dyson-control-bg);
+          box-shadow: var(--dyson-inner-highlight);
+        }
+        .sensor-details-section {
+          display: grid;
+          gap: 6px;
+        }
+        .sensor-details-heading {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--secondary-text-color);
+          font-size: 0.62rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0;
+        }
+        .sensor-details-heading ha-icon {
+          --mdc-icon-size: 13px;
+          color: var(--primary-color, #03a9f4);
+        }
+        .sensor-details-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .sensor-detail-item {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+          padding: 7px 8px;
+          border-radius: 12px;
+          background: var(--dyson-raised-bg);
+          border: 1px solid var(--dyson-soft-border);
+        }
+        .sensor-detail-item span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--secondary-text-color);
+          font-size: 0.58rem;
+          font-weight: 720;
+        }
+        .sensor-detail-item strong {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--primary-text-color);
+          font-size: 0.72rem;
+          font-weight: 820;
         }
         .wheel-center-info {
           position: absolute;
@@ -2772,6 +2981,12 @@ class HaDysonCard extends HTMLElement {
                 <span class="sensor-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
                 <span class="sensor-voc ${vocTone}"><span class="voc-dot" aria-hidden="true"></span>VOC</span>
                 <span class="sensor-filter"><ha-icon icon="mdi:air-filter"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
+                ${sensorDetailGroups.length ? `
+                  <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}">
+                    <span>${this._sensorDetailsOpen ? "Less" : "More"}</span>
+                    <ha-icon icon="${this._sensorDetailsOpen ? "mdi:chevron-up" : "mdi:dots-horizontal"}"></ha-icon>
+                  </button>
+                ` : ""}
               </div>
               <div class="wheel-center-info">
                 <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
@@ -2783,6 +2998,8 @@ class HaDysonCard extends HTMLElement {
             <div class="operation-status" aria-live="polite">
               ${operationActive ? this._escapeHtml(operationLabel) : ""}
             </div>
+
+            ${this._renderSensorDetails()}
 
             <div class="mode-row">
               <button class="mode-icon-button ${heatMode === "heat" ? "active" : ""}" data-hvac-mode="heat" aria-label="Heat mode" ${this._climateEntity() && this._hasHeatMode(heatModes, "heat") ? "" : "disabled"}>
