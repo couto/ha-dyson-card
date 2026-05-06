@@ -2170,9 +2170,11 @@ class HaDysonCard extends HTMLElement {
         }
         .speed-control {
           --speed-fill: ${speedPercent}%;
-          position: relative;
+          position: absolute;
+          top: 24px;
+          left: 0;
           width: 42px;
-          height: 100%;
+          height: calc(100% - 84px);
           display: grid;
           place-items: center;
           border-radius: 999px;
@@ -2189,9 +2191,9 @@ class HaDysonCard extends HTMLElement {
             linear-gradient(
               to top,
               color-mix(in srgb, var(--primary-color, #03a9f4) 86%, #00bcd4 14%) 0 var(--speed-fill),
-              color-mix(in srgb, var(--primary-color, #03a9f4) 18%, var(--card-background-color, #fff) 82%) var(--speed-fill) 100%
+              transparent var(--speed-fill) 100%
             );
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+          box-shadow: none;
           pointer-events: none;
         }
         .speed-rail::after {
@@ -2351,19 +2353,14 @@ class HaDysonCard extends HTMLElement {
           }
         }
         .wheel-sensor-strip {
-          position: absolute;
-          left: 50%;
-          right: auto;
-          top: 4px;
-          width: max-content;
-          max-width: calc(100% - 14px);
-          transform: translateX(-50%);
+          width: 100%;
+          max-width: 100%;
           display: flex;
           flex-wrap: wrap;
           align-items: center;
           justify-content: center;
           gap: 5px;
-          padding: 0;
+          padding: 0 6px;
           border-radius: 0;
           background: transparent;
           border: 0;
@@ -2372,7 +2369,7 @@ class HaDysonCard extends HTMLElement {
           font-size: 0.68rem;
           font-weight: 760;
           line-height: 1;
-          z-index: 8;
+          z-index: 1;
         }
         .wheel-sensor-strip:not(.expanded) {
           flex-wrap: nowrap;
@@ -3098,6 +3095,19 @@ class HaDysonCard extends HTMLElement {
           </div>
 
           <div class="control-shell">
+            <div class="wheel-sensor-strip ${this._sensorDetailsOpen ? "expanded" : ""}">
+              <span class="sensor-temp"><ha-icon icon="mdi:thermometer"></ha-icon>${this._escapeHtml(temp || "—")}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), "\u00b0")) : ""}</span>
+              <span class="sensor-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
+              <span class="sensor-aqi ${aqiTone}"><ha-icon icon="mdi:gauge"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
+              <span class="sensor-filter"><ha-icon icon="mdi:air-filter"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
+              ${sensorDetailGroups.length ? `
+                <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}">
+                  <span>${this._sensorDetailsOpen ? "Less" : "More"}</span>
+                  <ha-icon icon="${this._sensorDetailsOpen ? "mdi:chevron-up" : "mdi:dots-horizontal"}"></ha-icon>
+                </button>
+              ` : ""}
+              ${this._renderSensorDetails()}
+            </div>
             <div class="wheel-wrap">
               <div class="wheel-stage">
                 <button class="wheel-button" aria-label="Set Dyson direction">
@@ -3131,19 +3141,6 @@ class HaDysonCard extends HTMLElement {
                 <button class="speed-power-button power-button ${powerState === "On" ? "active" : ""}" aria-label="${powerState === "On" ? "Turn Dyson off" : "Turn Dyson on"}">
                   <ha-icon icon="mdi:power"></ha-icon>
                 </button>
-              </div>
-              <div class="wheel-sensor-strip ${this._sensorDetailsOpen ? "expanded" : ""}">
-                <span class="sensor-temp"><ha-icon icon="mdi:thermometer"></ha-icon>${this._escapeHtml(temp || "—")}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), "\u00b0")) : ""}</span>
-                <span class="sensor-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
-                <span class="sensor-aqi ${aqiTone}"><ha-icon icon="mdi:gauge"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
-                <span class="sensor-filter"><ha-icon icon="mdi:air-filter"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
-                ${sensorDetailGroups.length ? `
-                  <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}">
-                    <span>${this._sensorDetailsOpen ? "Less" : "More"}</span>
-                    <ha-icon icon="${this._sensorDetailsOpen ? "mdi:chevron-up" : "mdi:dots-horizontal"}"></ha-icon>
-                  </button>
-                ` : ""}
-                ${this._renderSensorDetails()}
               </div>
             </div>
 
