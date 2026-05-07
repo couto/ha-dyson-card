@@ -2122,13 +2122,13 @@ class HaDysonCard extends HTMLElement {
         }
         .control-shell {
           display: grid;
-          gap: 7px;
+          gap: 2px;
           justify-items: center;
         }
         .wheel-wrap {
           --dyson-speed-gutter: 52px;
           --dyson-wheel-size: min(calc(100% - var(--dyson-speed-gutter)), 304px);
-          --dyson-wheel-offset: 14px;
+          --dyson-wheel-offset: -8px;
           position: relative;
           width: 100%;
           height: auto;
