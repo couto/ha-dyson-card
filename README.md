@@ -17,6 +17,8 @@
 
 A sleek Lovelace dashboard card for Dyson fans, purifiers, humidifiers, and heater fans exposed through [`hass_dyson`](https://github.com/cmgrayb/hass-dyson).
 
+I built this because I dislike having to open the Dyson app just to make the fan face a certain direction. This card brings that daily control flow into Home Assistant, next to the rest of the dashboard.
+
 This is a frontend card only. It does not replace the Dyson integration; it uses the fan, climate, switch, select, number, and sensor entities already exposed in Home Assistant.
 
 <p align="center">
@@ -30,6 +32,12 @@ The default Home Assistant entity cards can control a Dyson device, but the expe
 HA Dyson Card pulls the useful pieces into one mobile-friendly control surface: direction aiming, sweep presets, airflow speed, power, auto/night mode, heat controls, filter life, and air-quality readings.
 
 The goal is simple: make the Dyson feel like a polished Home Assistant appliance control instead of a collection of separate toggles and sensors.
+
+## Highlights
+
+- Fully functional Dyson control surface for the main things you would normally open the Dyson app to do
+- Save preset directions with a name and icon, then tap once to aim the fan back there
+- Mobile-first layout with direction, sweep, airflow, timer, sensor, filter, heat, and mode controls in one card
 
 ## Features
 
