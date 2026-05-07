@@ -24,7 +24,7 @@ This repository contains only the frontend dashboard card. It does not replace t
 
 - Direction wheel with drag-to-aim control
 - Sweep dial presets for direct, 45°, 90°, 180°, and wide sweep
-- Saved direction snapshots with icon, name, direction, sweep, and airflow speed
+- Saved direction snapshots with icon, name, direction, and sweep
 - Compact top sensor badges for temperature, humidity, AQI, and filter life
 - Expandable air-quality details for AQI, PM2.5, PM10, VOC, and NO2 when available
 - Auto, night mode, airflow direction, sleep timer, fan speed, power, heat, fan-only, and target temperature controls
@@ -143,7 +143,6 @@ Each snapshot stores:
 - MDI icon
 - center direction
 - sweep width
-- airflow speed when available
 
 Snapshots are saved in the browser's `localStorage` under a key scoped to the configured fan entity:
 
@@ -151,7 +150,7 @@ Snapshots are saved in the browser's `localStorage` under a key scoped to the co
 ha-dyson-card:direction-presets:<fan entity>
 ```
 
-Because this is browser-local storage, snapshots persist on the same browser/device but do not automatically sync to other Home Assistant clients.
+Because this is browser-local storage, snapshots persist on the same browser/device but do not automatically sync to other Home Assistant clients. Snapshots do not save or apply airflow speed.
 
 The snapshot delete flow is confirmation-based: first tap arms the pill as `DELETE`, second tap on the red `DELETE` pill confirms. Tapping elsewhere cancels the armed delete state.
 

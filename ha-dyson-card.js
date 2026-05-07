@@ -977,14 +977,12 @@ class HaDysonCard extends HTMLElement {
         .map((preset) => {
           const direction = Number(preset.direction);
           const width = Number(preset.width);
-          const speed = Number(preset.speed);
           return {
             id: String(preset.id || ""),
             name: String(preset.name || "").trim(),
             icon: String(preset.icon || "mdi:crosshairs-gps").trim(),
             direction: Number.isFinite(direction) ? this._normalizeAngle(direction) : NaN,
             width: Number.isFinite(width) ? this._normalizeAngle(width) : NaN,
-            speed: Number.isFinite(speed) ? this._clamp(Math.round(speed), 0, 100) : null,
           };
         })
         .filter((preset) => preset.id && preset.name && Number.isFinite(preset.direction) && Number.isFinite(preset.width));
@@ -1001,11 +999,10 @@ class HaDysonCard extends HTMLElement {
     }
   }
 
-  _addDirectionPreset(name, icon, direction, width, speed) {
+  _addDirectionPreset(name, icon, direction, width) {
     const trimmedName = String(name || "").trim();
     if (!trimmedName) return;
     const normalizedIcon = String(icon || "mdi:crosshairs-gps").trim() || "mdi:crosshairs-gps";
-    const normalizedSpeed = Number(speed);
     const presets = this._directionPresets();
     presets.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1013,7 +1010,6 @@ class HaDysonCard extends HTMLElement {
       icon: normalizedIcon.startsWith("mdi:") ? normalizedIcon : `mdi:${normalizedIcon}`,
       direction: this._normalizeAngle(direction),
       width: this._normalizeAngle(width),
-      speed: Number.isFinite(normalizedSpeed) ? this._clamp(Math.round(normalizedSpeed), 0, 100) : null,
     });
     this._saveDirectionPresets(presets);
   }
@@ -1031,7 +1027,7 @@ class HaDysonCard extends HTMLElement {
     return hadPending;
   }
 
-  _renderDirectionPresets(direction, width, speed, controlReady) {
+  _renderDirectionPresets(direction, width, controlReady) {
     const presets = this._directionPresets();
     const disabled = controlReady ? "" : "disabled";
     const iconChoices = [
@@ -1067,7 +1063,7 @@ class HaDysonCard extends HTMLElement {
             const confirmingDelete = this._pendingPresetDeleteId === preset.id;
             return `
             <div class="direction-preset-item ${confirmingDelete ? "confirm-delete" : ""}">
-              <button class="direction-preset-button" ${confirmingDelete ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}" title="Delete snapshot"` : `data-preset-apply="${this._escapeHtml(preset.id)}" title="${this._escapeHtml(`${this._displayAngle(preset.direction, preset.width)}${preset.speed === null ? "" : ` · ${preset.speed}% speed`}`)}"`} ${disabled}>
+              <button class="direction-preset-button" ${confirmingDelete ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}" title="Delete snapshot"` : `data-preset-apply="${this._escapeHtml(preset.id)}" title="${this._escapeHtml(this._displayAngle(preset.direction, preset.width))}"`} ${disabled}>
                 ${confirmingDelete ? "" : `<ha-icon icon="${this._escapeHtml(preset.icon)}"></ha-icon>`}
                 <span>${confirmingDelete ? "DELETE" : this._escapeHtml(preset.name)}</span>
               </button>
@@ -1726,7 +1722,6 @@ class HaDysonCard extends HTMLElement {
         icon,
         this._currentDirection(attributes),
         this._currentWidth(attributes),
-        this._currentSpeed(attributes),
       );
       this._presetEditorOpen = false;
       this._presetDraftName = "";
@@ -1753,9 +1748,6 @@ class HaDysonCard extends HTMLElement {
           return;
         }
         await this._commitDirection(preset.direction, preset.width);
-        if (preset.speed !== null) {
-          await this._setFanSpeed(preset.speed);
-        }
       });
     });
 
@@ -3121,7 +3113,7 @@ class HaDysonCard extends HTMLElement {
 
           <div class="control-panel">
             <div class="control-grid">
-              <button class="control-pill snapshot-add-control" data-preset-add aria-label="Save current direction, sweep, and airflow speed" ${controlReady ? "" : "disabled"}>
+              <button class="control-pill snapshot-add-control" data-preset-add aria-label="Save current direction and sweep" ${controlReady ? "" : "disabled"}>
                 <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
                 <span>Save</span>
               </button>
@@ -3238,7 +3230,7 @@ class HaDysonCard extends HTMLElement {
 
           </div>
 
-          ${this._renderDirectionPresets(direction, width, speedPercent, controlReady)}
+          ${this._renderDirectionPresets(direction, width, controlReady)}
 
           ${controlReady ? "" : `<div class="helper">This card is still resolving the related Dyson device and companion entities from the selected fan entity.</div>`}
         </div>
