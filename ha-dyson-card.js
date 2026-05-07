@@ -2310,24 +2310,21 @@ class HaDysonCard extends HTMLElement {
         .speed-value {
           position: absolute;
           left: 50%;
-          bottom: var(--speed-fill);
+          bottom: 39px;
           z-index: 2;
           min-width: 0;
           padding: 0;
           border-radius: 0;
           background: transparent;
-          color: color-mix(in srgb, white 96%, transparent);
+          color: var(--primary-text-color);
           text-align: center;
-          font-size: 0.58rem;
+          font-size: 0.62rem;
           font-weight: 850;
           line-height: 1;
-          transform: translate(-50%, calc(50% + 14px));
+          transform: translateX(-50%);
           pointer-events: none;
-          text-shadow: 0 1px 2px color-mix(in srgb, #000 20%, transparent);
+          text-shadow: none;
           box-shadow: none;
-        }
-        .speed-rail .speed-value {
-          left: 50%;
         }
         .speed-power-button {
           position: absolute;
@@ -3190,11 +3187,10 @@ class HaDysonCard extends HTMLElement {
               </div>
               <div class="wheel-speed">
                 <div class="speed-control" style="--speed-fill: ${speedPercent}%;">
-                  <div class="speed-rail" aria-hidden="true">
-                    <span class="speed-value">${speedPercent}%</span>
-                  </div>
+                  <div class="speed-rail" aria-hidden="true"></div>
                   <input class="speed-slider" type="range" min="0" max="100" step="10" value="${speedPercent}" aria-label="Set airflow speed" ${speedAvailable ? "" : "disabled"} />
                 </div>
+                <span class="speed-value" aria-hidden="true">${speedPercent}%</span>
                 <button class="speed-power-button power-button ${powerState === "On" ? "active" : ""}" aria-label="${powerState === "On" ? "Turn Dyson off" : "Turn Dyson on"}">
                   <ha-icon icon="mdi:power"></ha-icon>
                 </button>
