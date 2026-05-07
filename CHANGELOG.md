@@ -4,6 +4,12 @@
 
 No unreleased changes.
 
+## 0.1.1 - 2026-05-07
+
+- Move the airflow speed percentage out of the vertical slider rail and place it between the slider and power button.
+- Reduce the direction wheel headroom below the sensor badges for a tighter mobile layout.
+- Refresh README wording, related-project links, and transparent icon artwork.
+
 ## 0.1.0 - 2026-05-07
 
 - Prepare the dashboard card repository for HACS custom repository use.
