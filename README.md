@@ -20,6 +20,10 @@
 
 This repository contains only the frontend dashboard card. It does not replace the Dyson integration; it uses the fan, climate, switch, select, number, and sensor entities that `hass_dyson` exposes in Home Assistant.
 
+<p align="center">
+  <img src=".github/images/ha-dyson-card-preview.jpg" alt="HA Dyson Card dashboard preview" width="390">
+</p>
+
 ## Highlights
 
 - Direction wheel with drag-to-aim control
