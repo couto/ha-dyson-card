@@ -42,12 +42,6 @@ class HaDysonCard extends HTMLElement {
             },
           },
         },
-        {
-          name: "show_debug",
-          selector: {
-            boolean: {},
-          },
-        },
       ],
       computeLabel: (schema) => {
         switch (schema.name) {
@@ -57,8 +51,6 @@ class HaDysonCard extends HTMLElement {
             return "Title";
           case "default_oscillation_angle":
             return "Default oscillation width";
-          case "show_debug":
-            return "Show live debug";
           default:
             return undefined;
         }
@@ -67,8 +59,6 @@ class HaDysonCard extends HTMLElement {
         switch (schema.name) {
           case "default_oscillation_angle":
             return "Used when current sweep width cannot be derived from the Dyson device.";
-          case "show_debug":
-            return "Shows live Dyson entity state and attributes for testing.";
           default:
             return undefined;
         }
@@ -112,7 +102,6 @@ class HaDysonCard extends HTMLElement {
     this._config = {
       title: "",
       default_oscillation_angle: 90,
-      show_debug: true,
       ...config,
     };
     this._derived = null;

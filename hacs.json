@@ -1,6 +1,7 @@
 {
   "name": "HA Dyson Card",
+  "filename": "ha-dyson-card.js",
+  "content_in_root": true,
   "render_readme": true,
-  "homeassistant": "2024.8.0",
-  "filename": "ha-dyson-card.js"
+  "homeassistant": "2024.8.0"
 }
