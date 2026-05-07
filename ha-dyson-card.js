@@ -976,16 +976,14 @@ class HaDysonCard extends HTMLElement {
       return parsed
         .map((preset) => {
           const direction = Number(preset.direction);
-          const width = Number(preset.width);
           return {
             id: String(preset.id || ""),
             name: String(preset.name || "").trim(),
             icon: String(preset.icon || "mdi:crosshairs-gps").trim(),
             direction: Number.isFinite(direction) ? this._normalizeAngle(direction) : NaN,
-            width: Number.isFinite(width) ? this._normalizeAngle(width) : NaN,
           };
         })
-        .filter((preset) => preset.id && preset.name && Number.isFinite(preset.direction) && Number.isFinite(preset.width));
+        .filter((preset) => preset.id && preset.name && Number.isFinite(preset.direction));
     } catch (_error) {
       return [];
     }
@@ -999,7 +997,7 @@ class HaDysonCard extends HTMLElement {
     }
   }
 
-  _addDirectionPreset(name, icon, direction, width) {
+  _addDirectionPreset(name, icon, direction) {
     const trimmedName = String(name || "").trim();
     if (!trimmedName) return;
     const normalizedIcon = String(icon || "mdi:crosshairs-gps").trim() || "mdi:crosshairs-gps";
@@ -1009,7 +1007,6 @@ class HaDysonCard extends HTMLElement {
       name: trimmedName,
       icon: normalizedIcon.startsWith("mdi:") ? normalizedIcon : `mdi:${normalizedIcon}`,
       direction: this._normalizeAngle(direction),
-      width: this._normalizeAngle(width),
     });
     this._saveDirectionPresets(presets);
   }
@@ -1063,14 +1060,14 @@ class HaDysonCard extends HTMLElement {
             const confirmingDelete = this._pendingPresetDeleteId === preset.id;
             return `
             <div class="direction-preset-item ${confirmingDelete ? "confirm-delete" : ""}">
-              <button class="direction-preset-button" ${confirmingDelete ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}" title="Delete snapshot"` : `data-preset-apply="${this._escapeHtml(preset.id)}" title="${this._escapeHtml(this._displayAngle(preset.direction, preset.width))}"`} ${disabled}>
+              <button class="direction-preset-button" ${confirmingDelete ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}" title="Delete direction preset"` : `data-preset-apply="${this._escapeHtml(preset.id)}" title="${this._escapeHtml(`${preset.direction}\u00b0 direction`)}"`} ${disabled}>
                 ${confirmingDelete ? "" : `<ha-icon icon="${this._escapeHtml(preset.icon)}"></ha-icon>`}
                 <span>${confirmingDelete ? "DELETE" : this._escapeHtml(preset.name)}</span>
               </button>
-              <button class="direction-preset-remove" data-preset-remove="${this._escapeHtml(preset.id)}" aria-label="${confirmingDelete ? "Delete snapshot" : `Remove ${this._escapeHtml(preset.name)}`}">${confirmingDelete ? "×" : "×"}</button>
+              <button class="direction-preset-remove" data-preset-remove="${this._escapeHtml(preset.id)}" aria-label="${confirmingDelete ? "Delete direction preset" : `Remove ${this._escapeHtml(preset.name)}`}">${confirmingDelete ? "×" : "×"}</button>
             </div>
           `;
-          }).join("") : `<span class="direction-presets-empty">No snapshots saved</span>`}
+          }).join("") : `<span class="direction-presets-empty">No direction presets saved</span>`}
         </div>
         ${editor}
       </div>
@@ -1721,7 +1718,6 @@ class HaDysonCard extends HTMLElement {
         name,
         icon,
         this._currentDirection(attributes),
-        this._currentWidth(attributes),
       );
       this._presetEditorOpen = false;
       this._presetDraftName = "";
@@ -1747,7 +1743,7 @@ class HaDysonCard extends HTMLElement {
           this._render();
           return;
         }
-        await this._commitDirection(preset.direction, preset.width);
+        await this._commitDirection(preset.direction, this._currentWidth(attributes));
       });
     });
 
@@ -2638,8 +2634,7 @@ class HaDysonCard extends HTMLElement {
             );
           box-shadow: none;
         }
-        .sweep-dial-option,
-        .snapshot-button {
+        .sweep-dial-option {
           position: absolute;
           border: 0;
           border-radius: 999px;
@@ -2762,7 +2757,6 @@ class HaDysonCard extends HTMLElement {
         .speed-slider:disabled,
         .direction-preset-button:disabled,
         .direction-preset-add:disabled,
-        .snapshot-button:disabled,
         .sweep-dial-option:disabled {
           opacity: 0.44;
         }
@@ -3113,7 +3107,7 @@ class HaDysonCard extends HTMLElement {
 
           <div class="control-panel">
             <div class="control-grid">
-              <button class="control-pill snapshot-add-control" data-preset-add aria-label="Save current direction and sweep" ${controlReady ? "" : "disabled"}>
+              <button class="control-pill direction-preset-add-control" data-preset-add aria-label="Save current direction preset" ${controlReady ? "" : "disabled"}>
                 <ha-icon icon="mdi:camera-plus-outline"></ha-icon>
                 <span>Save</span>
               </button>

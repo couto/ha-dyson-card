@@ -24,7 +24,7 @@ This repository contains only the frontend dashboard card. It does not replace t
 
 - Direction wheel with drag-to-aim control
 - Sweep dial presets for direct, 45°, 90°, 180°, and wide sweep
-- Saved direction snapshots with icon, name, direction, and sweep
+- Saved direction presets with icon, name, and direction
 - Compact top sensor badges for temperature, humidity, AQI, and filter life
 - Expandable air-quality details for AQI, PM2.5, PM10, VOC, and NO2 when available
 - Auto, night mode, airflow direction, sleep timer, fan speed, power, heat, fan-only, and target temperature controls
@@ -133,26 +133,25 @@ The `More` button expands a focused air-quality section when matching sensors ex
 | VOC | Volatile Organic Compounds, usually gases and chemical vapors from cooking, cleaning products, smoke, or materials. |
 | NO2 | Nitrogen dioxide, commonly associated with combustion sources. |
 
-## Direction Snapshots
+## Direction Presets
 
-Direction snapshots let you save repeatable aiming positions such as `Bed`, `Desk`, or `Door`.
+Direction presets let you save repeatable aiming positions such as `Bed`, `Desk`, or `Door`.
 
-Each snapshot stores:
+Each direction preset stores:
 
 - name
 - MDI icon
 - center direction
-- sweep width
 
-Snapshots are saved in the browser's `localStorage` under a key scoped to the configured fan entity:
+Direction presets are saved in the browser's `localStorage` under a key scoped to the configured fan entity:
 
 ```text
 ha-dyson-card:direction-presets:<fan entity>
 ```
 
-Because this is browser-local storage, snapshots persist on the same browser/device but do not automatically sync to other Home Assistant clients. Snapshots do not save or apply airflow speed.
+Because this is browser-local storage, direction presets persist on the same browser/device but do not automatically sync to other Home Assistant clients. Direction presets save and apply direction only; they do not save or apply sweep or airflow speed.
 
-The snapshot delete flow is confirmation-based: first tap arms the pill as `DELETE`, second tap on the red `DELETE` pill confirms. Tapping elsewhere cancels the armed delete state.
+The direction preset delete flow is confirmation-based: first tap arms the pill as `DELETE`, second tap on the red `DELETE` pill confirms. Tapping elsewhere cancels the armed delete state.
 
 ## Entity Discovery
 
