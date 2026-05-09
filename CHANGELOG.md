@@ -4,6 +4,12 @@
 
 No unreleased changes.
 
+## 0.1.2 - 2026-05-09
+
+- Show saved direction presets as icon markers on the direction wheel.
+- Align preset markers and the draggable direction handle to the outer wheel radius.
+- Refresh the README preview image with the current direction preset UI.
+
 ## 0.1.1 - 2026-05-07
 
 - Move the airflow speed percentage out of the vertical slider rail and place it between the slider and power button.
