@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/github/downloads/thanhn062/ha-dyson-card/total?style=for-the-badge)](https://github.com/thanhn062/ha-dyson-card/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg?style=for-the-badge)](https://github.com/thanhn062/ha-dyson-card/blob/main/LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.8.0-blue.svg?style=for-the-badge&logo=home-assistant)](https://www.home-assistant.io/)
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://www.hacs.xyz/docs/faq/custom_repositories/)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://www.hacs.xyz/docs/use/repositories/dashboard/)
 [![Validate](https://img.shields.io/github/actions/workflow/status/thanhn062/ha-dyson-card/validate.yaml?branch=main&style=for-the-badge&label=validate)](https://github.com/thanhn062/ha-dyson-card/actions/workflows/validate.yaml)
 [![Requires hass_dyson](https://img.shields.io/badge/Requires-hass__dyson-00A3E0.svg?style=for-the-badge)](https://github.com/cmgrayb/hass-dyson)
 [![Made with AI](https://img.shields.io/badge/Made%20with-AI-lightgrey?style=for-the-badge)](https://github.com/mefengl/made-by-ai)
@@ -88,13 +88,12 @@ Direction presets are local to the browser/device. They do not sync automaticall
 
 ## HACS Install
 
-Default HACS inclusion is still pending. For now, install it as a custom repository:
+Install it from the default HACS catalog:
 
-1. HACS -> top-right menu -> `Custom repositories`
-2. Repository: `https://github.com/thanhn062/ha-dyson-card`
-3. Category: `Dashboard`
-4. Install `HA Dyson Card`
-5. Refresh or reopen Home Assistant so the dashboard resource is loaded
+1. HACS -> `Dashboard`
+2. Search for `HA Dyson Card`
+3. Install `HA Dyson Card`
+4. Refresh or reopen Home Assistant so the dashboard resource is loaded
 
 HACS installs dashboard cards under `www/community/` and serves them through `/hacsfiles/`.
 
