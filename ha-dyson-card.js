@@ -1915,6 +1915,7 @@ class HaDysonCard extends HTMLElement {
     const speedAvailable = this._supportsFanSpeed(attributes);
     const airflowControlSide = String(this._config.airflow_control_side || "right").toLowerCase() === "left" ? "left" : "right";
     const speedOnLeft = airflowControlSide === "left";
+    const mushroomMode = this._config.mushroom_theme === true;
     const direction = this._currentDirection(attributes);
     const width = this._currentWidth(attributes);
     const sensorDetailGroups = this._sensorDetailGroups();
@@ -1940,16 +1941,31 @@ class HaDysonCard extends HTMLElement {
       : "";
     const directPath = this._arcPath(160, 160, 116, visualCenter - 1, visualCenter + 1);
 
-    this.shadowRoot.innerHTML = `
-      <style>
-        :host {
-          display: block;
+    const haCardCSS = mushroomMode
+      ? `
+        ha-card {
+          --dyson-panel-bg: color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 94%, #000 6%);
+          --dyson-field-bg: color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 84%, transparent);
+          --dyson-raised-bg: var(--mush-chip-background, var(--ha-card-background, var(--card-background-color, #fff)));
+          --dyson-pill-bg: var(--mush-chip-background, var(--ha-card-background, var(--card-background-color, #fff)));
+          --dyson-active-bg: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.2);
+          --dyson-control-bg: color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 92%, #000 8%);
+          --dyson-inset-bg: color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 84%, #000 16%);
+          --dyson-panel-surface: color-mix(in srgb, var(--dyson-panel-bg) 72%, transparent);
+          --dyson-wheel-bg: color-mix(in srgb, var(--ha-card-background, var(--card-background-color, #fff)) 78%, var(--primary-text-color) 22%);
+          --dyson-cone-bg: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.18);
+          --dyson-border: var(--mush-chip-border-color, var(--ha-card-border-color, var(--divider-color)));
+          --dyson-soft-border: color-mix(in srgb, var(--mush-chip-border-color, var(--divider-color)) 72%, transparent);
+          --dyson-shadow: var(--mush-chip-box-shadow, none);
+          --dyson-inner-highlight: none;
+          padding: 12px;
+          margin-block-end: max(12px, env(safe-area-inset-bottom));
+          border-radius: var(--ha-card-border-radius, 12px);
+          overflow: hidden;
+          color: var(--primary-text-color);
         }
-        *,
-        *::before,
-        *::after {
-          box-sizing: border-box;
-        }
+      `
+      : `
         ha-card {
           --dyson-panel-bg: color-mix(in srgb, var(--card-background-color, #fff) 94%, #000 6%);
           --dyson-field-bg: color-mix(in srgb, var(--card-background-color, #fff) 84%, transparent);
@@ -1989,6 +2005,19 @@ class HaDysonCard extends HTMLElement {
             --dyson-inner-highlight: inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
           }
         }
+      `;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+        }
+        *,
+        *::before,
+        *::after {
+          box-sizing: border-box;
+        }
+        ${haCardCSS}
         .card {
           display: grid;
           gap: 10px;
