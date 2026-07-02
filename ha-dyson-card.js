@@ -3265,29 +3265,7 @@ class HaDysonCard extends HTMLElement {
               ${this._renderSensorDetails()}
             </div>
             <div class="wheel-wrap">
-              <div class="wheel-stage">
-                <button class="wheel-button" aria-label="Set Dyson direction">
-                  <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
-                    <path class="wheel-bg" d="${travelPath}"></path>
-                    <path class="wheel-ring" d="${travelRingPath}"></path>
-                    <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
-                    <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
-                    <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
-                    <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
-                    <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
-                    <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
-                    ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
-                    <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
-                  </svg>
-                </button>
-                ${this._renderDirectionPresetMarkers()}
-                <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
-                <div class="wheel-center-info">
-                  <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
-                    ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
-                  </div>
-                </div>
-              </div>
+              ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
               <div class="wheel-speed">
                 <div class="speed-control" style="--speed-fill: ${speedPercent}%;">
                   <div class="speed-rail" aria-hidden="true"></div>
@@ -3332,9 +3310,1110 @@ class HaDysonCard extends HTMLElement {
 
     this._bindControls(attributes, powerState);
   }
+
+  _renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady }) {
+    return `
+      <div class="wheel-stage">
+        <button class="wheel-button" aria-label="Set Dyson direction">
+          <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
+            <path class="wheel-bg" d="${travelPath}"></path>
+            <path class="wheel-ring" d="${travelRingPath}"></path>
+            <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
+            <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
+            <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
+            <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
+            <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
+            <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
+            ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
+            <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
+          </svg>
+        </button>
+        ${this._renderDirectionPresetMarkers()}
+        <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
+        <div class="wheel-center-info">
+          <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
+            ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+class HaDysonMushroomCard extends HaDysonCard {
+  static getStubConfig() {
+    return {
+      entity: "fan.my_dyson",
+    };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: "entity",
+          required: true,
+          selector: {
+            entity: {
+              filter: [{ domain: "fan" }],
+            },
+          },
+        },
+        {
+          name: "title",
+          selector: { text: {} },
+        },
+      ],
+      computeLabel: (schema) => {
+        switch (schema.name) {
+          case "entity":
+            return "Dyson entity";
+          case "title":
+            return "Title";
+          default:
+            return undefined;
+        }
+      },
+    };
+  }
+
+  _render() {
+    if (!this.shadowRoot) return;
+
+    if (!this._hass || !this._config?.entity) {
+      this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:#d9485f;">Entity required</div></ha-card>`;
+      return;
+    }
+
+    const entity = this._stateObj(this._config.entity);
+    if (!entity) {
+      this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:#d9485f;">Entity not found: ${this._escapeHtml(this._config.entity)}</div></ha-card>`;
+      return;
+    }
+
+    const attributes = entity.attributes || {};
+    const isOn = entity.state === "on";
+    const powerState = isOn ? "On" : "Off";
+    const speedPercent = this._currentSpeed(attributes);
+    const entityName = this._config.title || this._friendlyName(this._config.entity, this._config.entity);
+    const stateText = isOn ? `On${speedPercent ? ` · ${speedPercent}%` : ""}` : "Off";
+
+    const direction = this._currentDirection(attributes);
+    const width = this._currentWidth(attributes);
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const visualCenter = this._visualAngleFromDevice(bounds.center);
+    const handle = this._pointForAngle(160, 160, 128, visualCenter);
+    const presetWidths = [0, 45, 90, 180, 350];
+    const controlReady = Boolean(this._deviceId());
+    const travelPath = this._sectorPath(160, 160, 128, 5, 355);
+    const travelRingPath = this._arcPath(160, 160, 128, 5, 355);
+    const lowerLimitInner = this._pointForAngle(160, 160, 54, 5);
+    const lowerLimitOuter = this._pointForAngle(160, 160, 132, 5);
+    const upperLimitInner = this._pointForAngle(160, 160, 54, 355);
+    const upperLimitOuter = this._pointForAngle(160, 160, 132, 355);
+    const conePath = bounds.width
+      ? this._sectorPath(160, 160, 128, this._visualAngleFromDevice(bounds.lower), this._visualAngleFromDevice(bounds.upper))
+      : "";
+    const directPath = this._arcPath(160, 160, 116, visualCenter - 1, visualCenter + 1);
+    const operationActive = this._busy || this._pendingActive();
+    const speedAvailable = this._supportsFanSpeed(attributes);
+    const mode = attributes.preset_mode || attributes.mode || "";
+    const airflowDirection = this._fanDirection(attributes);
+    const activeTimer = Number(attributes.sleep_timer || 0);
+    const timerLabel = this._timerLabel(attributes);
+
+    // U6 – sensor strip
+    const temp = this._stateValue(this._temperatureEntity(), "");
+    const humidity = this._stateValue(this._humidityEntity(), "");
+    const aqi = this._stateValue(this._airQualityEntity(), "");
+    const aqiTone = aqi ? this._qualityTone(this._qualityLabel(aqi)) : "neutral";
+    const filterPct = this._filterPercent();
+
+    // U9 – heat mode
+    const climateEntity = this._climateEntity();
+    const climateAttributes = climateEntity ? (this._stateObj(climateEntity)?.attributes || {}) : {};
+    const heatModes = this._heatModes(climateAttributes);
+    const targetTemp = this._targetTemperature(climateAttributes);
+    const tempUnit = climateAttributes.temperature_unit || this._unit(this._temperatureEntity(), "°");
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        ha-card {
+          border-radius: var(--ha-card-border-radius, 12px);
+          overflow: hidden;
+          color: var(--primary-text-color);
+        }
+
+        .mc {
+          padding: var(--mush-spacing, 12px);
+          display: grid;
+          gap: 12px;
+        }
+
+        .mc-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .mc-icon-shape {
+          flex-shrink: 0;
+          width: var(--mush-icon-size, 42px);
+          height: var(--mush-icon-size, 42px);
+          border-radius: 50%;
+          border: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+          color: var(--secondary-text-color);
+          cursor: pointer;
+          padding: 0;
+          transition: background 0.2s, color 0.2s;
+        }
+
+        .mc-icon-shape--on {
+          background: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.2);
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+        }
+
+        .mc-icon {
+          --mdc-icon-size: calc(var(--mush-icon-size, 42px) * 0.55);
+        }
+
+        @keyframes mc-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .mc-icon--spin {
+          animation: mc-spin 2s linear infinite;
+        }
+
+        .mc-info {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .mc-name {
+          font-size: var(--mush-card-primary-font-size, 14px);
+          font-weight: var(--mush-card-primary-font-weight, 500);
+          color: var(--primary-text-color);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .mc-state {
+          font-size: var(--mush-card-secondary-font-size, 12px);
+          font-weight: var(--mush-card-secondary-font-weight, 400);
+          color: var(--secondary-text-color);
+        }
+
+        .mc-wheel {
+          --dyson-wheel-bg: color-mix(in srgb, var(--card-background-color, #fff) 78%, var(--primary-text-color) 22%);
+          --dyson-cone-bg: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.18);
+          --dyson-border: var(--mush-chip-border-color, var(--divider-color));
+          --dyson-soft-border: color-mix(in srgb, var(--mush-chip-border-color, var(--divider-color)) 72%, transparent);
+          --dyson-inner-highlight: none;
+          --dyson-raised-bg: var(--card-background-color, #fff);
+          width: 100%;
+          max-width: 304px;
+          margin: 0 auto;
+        }
+
+        .wheel-stage {
+          position: relative;
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1 / 1;
+        }
+
+        .wheel-button {
+          appearance: none;
+          border: 0;
+          padding: 0;
+          background: none;
+          cursor: default;
+          width: 100%;
+          margin: 0;
+          touch-action: pan-y;
+          display: block;
+        }
+
+        .wheel {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        .wheel-bg {
+          fill: var(--dyson-wheel-bg);
+          pointer-events: none;
+        }
+
+        .wheel-ring {
+          fill: none;
+          stroke: color-mix(in srgb, var(--primary-text-color, #111) 14%, transparent);
+          stroke-width: 2;
+          pointer-events: none;
+        }
+
+        .wheel-limit {
+          stroke: color-mix(in srgb, var(--primary-text-color, #111) 28%, transparent);
+          stroke-width: 3;
+          stroke-linecap: round;
+          pointer-events: none;
+        }
+
+        .wheel-cone {
+          fill: var(--dyson-cone-bg);
+          pointer-events: none;
+        }
+
+        .wheel-direct {
+          fill: none;
+          stroke: color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 72%, white 8%);
+          stroke-width: 8;
+          stroke-linecap: round;
+          pointer-events: none;
+        }
+
+        .wheel-core {
+          fill: transparent;
+          stroke: none;
+          pointer-events: none;
+        }
+
+        .wheel-core-inner {
+          fill: transparent;
+          pointer-events: none;
+        }
+
+        .wheel-spinner {
+          fill: none;
+          stroke: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-dasharray: 18 34;
+          transform-origin: 160px 160px;
+          animation: dyson-spin 1.6s linear infinite;
+        }
+
+        @keyframes dyson-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .wheel-handle {
+          fill: var(--card-background-color, #fff);
+          stroke: var(--primary-text-color, #111);
+          stroke-width: 5;
+          cursor: ${controlReady ? "grab" : "default"};
+          pointer-events: none;
+        }
+
+        .wheel-handle-hit {
+          position: absolute;
+          left: ${((handle.x / 320) * 100).toFixed(4)}%;
+          top: ${((handle.y / 320) * 100).toFixed(4)}%;
+          width: 52px;
+          height: 52px;
+          transform: translate(-50%, -50%);
+          border: 0;
+          border-radius: 999px;
+          padding: 0;
+          background: transparent;
+          cursor: ${controlReady ? "grab" : "default"};
+          touch-action: none;
+          z-index: 3;
+        }
+
+        .wheel-handle-hit:active {
+          cursor: grabbing;
+        }
+
+        .wheel-preset-marker {
+          position: absolute;
+          transform: translate(-50%, -50%);
+          z-index: 2;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--success-color, #22c55e) 82%, transparent);
+          border: 1px solid color-mix(in srgb, white 45%, transparent);
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 42%, transparent),
+            0 4px 10px color-mix(in srgb, #000 24%, transparent);
+          color: white;
+          pointer-events: none;
+        }
+
+        .wheel-preset-marker ha-icon {
+          --mdc-icon-size: 18px;
+          filter: drop-shadow(0 1px 1px color-mix(in srgb, #000 32%, transparent));
+        }
+
+        .wheel-center-info {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 152px;
+          height: 152px;
+          pointer-events: auto;
+          color: var(--primary-text-color);
+          z-index: 3;
+        }
+
+        .sweep-dial {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--dyson-raised-bg) 72%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+            0 4px 10px color-mix(in srgb, #000 8%, transparent);
+          --sweep-start: 0deg;
+          --sweep-size: 72deg;
+        }
+
+        .sweep-dial-active-0 { --sweep-start: -36deg; }
+        .sweep-dial-active-45 { --sweep-start: 36deg; }
+        .sweep-dial-active-90 { --sweep-start: 108deg; }
+        .sweep-dial-active-180 { --sweep-start: 180deg; }
+        .sweep-dial-active-350 { --sweep-start: 252deg; }
+
+        .sweep-dial::before {
+          content: "";
+          position: absolute;
+          inset: 4px;
+          border-radius: 999px;
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
+          background:
+            conic-gradient(
+              from var(--sweep-start),
+              color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 13%, transparent) 0 var(--sweep-size),
+              transparent var(--sweep-size) 360deg
+            ),
+            repeating-conic-gradient(
+              from -36deg,
+              color-mix(in srgb, var(--primary-text-color) 9%, transparent) 0 1deg,
+              transparent 1deg 72deg
+            );
+          box-shadow: none;
+        }
+
+        .sweep-dial-option {
+          position: absolute;
+          border: 0;
+          border-radius: 999px;
+          background: transparent;
+          color: var(--secondary-text-color);
+          font: inherit;
+          font-size: 0.88rem;
+          font-weight: 860;
+          line-height: 1;
+          width: 44px;
+          height: 44px;
+          padding: 0;
+          transform: translate(-50%, -50%);
+          z-index: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .sweep-dial-option span {
+          min-width: 34px;
+          height: 30px;
+          padding: 0 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
+          font-size: inherit;
+          font-weight: inherit;
+        }
+
+        .sweep-dial-option--0  { left: 50%; top: 16%; }
+        .sweep-dial-option--45 { left: 77%; top: 38%; }
+        .sweep-dial-option--90 { left: 67%; top: 74%; }
+        .sweep-dial-option--180 { left: 33%; top: 74%; }
+        .sweep-dial-option--350 { left: 23%; top: 38%; }
+
+        .sweep-dial-option.active span {
+          background: transparent;
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          box-shadow: none;
+          text-shadow: 0 0 10px color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 24%, transparent);
+        }
+
+        .sweep-dial-option:disabled {
+          opacity: 0.44;
+        }
+
+        /* Speed control */
+        .mc-speed {
+          display: grid;
+          gap: 6px;
+        }
+
+        .mc-speed-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: var(--mush-card-secondary-font-size, 12px);
+          color: var(--secondary-text-color);
+        }
+
+        .mc-speed-value {
+          font-weight: 600;
+          color: var(--primary-text-color);
+        }
+
+        .mc-speed-slider {
+          width: 100%;
+          height: 6px;
+          border-radius: 999px;
+          appearance: none;
+          outline: none;
+          border: 0;
+          cursor: pointer;
+          background: linear-gradient(
+            to right,
+            rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 0 var(--mc-speed-pct, 0%),
+            color-mix(in srgb, var(--primary-text-color) 15%, transparent) var(--mc-speed-pct, 0%) 100%
+          );
+        }
+
+        .mc-speed-slider:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+
+        .mc-speed-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+
+        .mc-speed-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          border: 0;
+        }
+
+        /* Chips */
+        .mc-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--mush-chip-spacing, 8px);
+        }
+
+        .mc-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: var(--mush-chip-height, 36px);
+          padding: 0 10px;
+          border-radius: var(--mush-chip-border-radius, 19px);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: var(--mush-chip-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: var(--mush-chip-font-size, 0.8rem);
+          font-weight: var(--mush-chip-font-weight, 500);
+          cursor: pointer;
+          white-space: nowrap;
+          box-shadow: var(--mush-chip-box-shadow, none);
+        }
+
+        .mc-chip--active {
+          background: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.2);
+          border-color: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.4);
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+        }
+
+        .mc-chip:disabled {
+          opacity: 0.44;
+          cursor: default;
+        }
+
+        .mc-chip-icon {
+          --mdc-icon-size: 16px;
+        }
+
+        /* U6 – sensor strip */
+        .mc-sensors {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        .mc-sensor-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: 28px;
+          padding: 0 8px;
+          border-radius: var(--mush-chip-border-radius, 19px);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: var(--mush-chip-background, var(--card-background-color, #fff));
+          color: var(--secondary-text-color);
+          font: inherit;
+          font-size: 0.72rem;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: var(--mush-chip-box-shadow, none);
+        }
+
+        .mc-sensor-chip--good { color: #4caf50; }
+        .mc-sensor-chip--fair { color: #ff9800; }
+        .mc-sensor-chip--poor { color: #f44336; }
+
+        .mc-sensor-detail {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-sensor-group-label {
+          font-size: 0.7rem;
+          font-weight: 700;
+          color: var(--secondary-text-color);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 4px;
+        }
+
+        .mc-sensor-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+          gap: 6px;
+        }
+
+        .mc-sensor-item {
+          display: grid;
+          gap: 1px;
+          padding: 6px 8px;
+          border-radius: 8px;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+        }
+
+        .mc-sensor-value {
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: var(--primary-text-color);
+        }
+
+        .mc-sensor-label {
+          font-size: 0.66rem;
+          color: var(--secondary-text-color);
+        }
+
+        /* U7 – timer flyout */
+        .mc-timer {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-timer-custom {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .mc-timer-input {
+          flex: 1;
+          min-width: 0;
+          height: 36px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          padding: 0 10px;
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 0.8rem;
+        }
+
+        /* U8 – direction presets */
+        .mc-presets { display: grid; gap: 8px; }
+
+        .mc-presets-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .mc-presets-row::-webkit-scrollbar { display: none; }
+
+        .mc-preset-item {
+          display: inline-flex;
+          align-items: center;
+          flex: 0 0 auto;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-chip-border-radius, 19px);
+          background: var(--mush-chip-background, var(--card-background-color));
+          overflow: hidden;
+        }
+
+        .mc-preset-item--confirm {
+          border-color: rgba(239,68,68,0.5);
+          background: rgba(239,68,68,0.1);
+        }
+
+        .mc-preset-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 0 10px;
+          height: 36px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .mc-preset-remove {
+          width: 30px;
+          height: 36px;
+          border: 0;
+          border-left: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: transparent;
+          color: var(--secondary-text-color);
+          cursor: pointer;
+          font-size: 1rem;
+        }
+
+        .mc-preset-add {
+          flex: 0 0 36px;
+          width: 36px;
+          height: 36px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: 50%;
+          background: var(--mush-chip-background, var(--card-background-color));
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: var(--secondary-text-color);
+        }
+
+        .mc-preset-editor {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        /* U9 – heat mode */
+        .mc-heat { display: grid; gap: 8px; }
+
+        .mc-temp {
+          display: inline-flex;
+          align-items: center;
+          gap: 0;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          overflow: hidden;
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-temp-btn {
+          width: 40px;
+          height: 40px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 1.2rem;
+          cursor: pointer;
+        }
+
+        .mc-temp-value {
+          flex: 1;
+          text-align: center;
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: var(--primary-text-color);
+          padding: 0 8px;
+        }
+      </style>
+      <ha-card>
+        <div class="mc">
+          <div class="mc-header">
+            <button class="mc-icon-shape ${isOn ? "mc-icon-shape--on" : ""}" data-power-toggle aria-label="${isOn ? "Turn off" : "Turn on"}">
+              <ha-icon icon="mdi:fan" class="mc-icon ${isOn ? "mc-icon--spin" : ""}"></ha-icon>
+            </button>
+            <div class="mc-info">
+              <div class="mc-name">${this._escapeHtml(entityName)}</div>
+              <div class="mc-state">${this._escapeHtml(stateText)}</div>
+            </div>
+          </div>
+          <!-- Wheel -->
+          <div class="mc-wheel">
+            ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
+          </div>
+          <!-- Speed control -->
+          ${speedAvailable && isOn ? `
+          <div class="mc-speed">
+            <div class="mc-speed-header">
+              <span class="mc-speed-label">Speed</span>
+              <span class="mc-speed-value">${speedPercent}%</span>
+            </div>
+            <input
+              type="range"
+              class="mc-speed-slider"
+              min="0"
+              max="100"
+              step="10"
+              value="${speedPercent}"
+              ${this._busy ? "disabled" : ""}
+              aria-label="Fan speed"
+            />
+          </div>
+          ` : ""}
+          <!-- Primary chips -->
+          <div class="mc-chips">
+            ${this._supportsAutoMode(attributes) ? `
+              <button class="mc-chip ${this._isAutoMode(mode, attributes) ? "mc-chip--active" : ""}" data-control="auto" aria-label="Auto mode">
+                <ha-icon icon="mdi:motion" class="mc-chip-icon"></ha-icon>
+                <span>Auto</span>
+              </button>
+            ` : ""}
+            ${this._nightModeEntity() ? `
+              <button class="mc-chip ${this._nightModeOn(attributes) ? "mc-chip--active" : ""}" data-control="night" aria-label="Night mode">
+                <ha-icon icon="mdi:weather-night" class="mc-chip-icon"></ha-icon>
+                <span>Night</span>
+              </button>
+            ` : ""}
+            ${this._supportsFanDirection(attributes) ? `
+              <button class="mc-chip ${airflowDirection === "reverse" ? "mc-chip--active" : ""}" data-direction-toggle aria-label="Airflow direction">
+                <ha-icon icon="mdi:swap-horizontal" class="mc-chip-icon"></ha-icon>
+                <span>${airflowDirection === "reverse" ? "Reverse" : "Forward"}</span>
+              </button>
+            ` : ""}
+            <button class="mc-chip ${activeTimer > 0 ? "mc-chip--active" : ""}" data-timer-toggle aria-label="Sleep timer">
+              <ha-icon icon="mdi:timer-outline" class="mc-chip-icon"></ha-icon>
+              <span>${timerLabel}</span>
+            </button>
+          </div>
+          <!-- U6: Sensor strip -->
+          ${(temp || humidity || aqi || filterPct !== null) ? `
+          <div class="mc-sensors">
+            ${temp ? `
+              <button class="mc-sensor-chip" data-sensor-more aria-label="Show sensor details">
+                <ha-icon icon="mdi:thermometer" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(temp)}${this._escapeHtml(this._unit(this._temperatureEntity(), "°"))}</span>
+              </button>
+            ` : ""}
+            ${humidity ? `
+              <button class="mc-sensor-chip" data-sensor-more>
+                <ha-icon icon="mdi:water-percent" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(humidity)}%</span>
+              </button>
+            ` : ""}
+            ${aqi ? `
+              <button class="mc-sensor-chip mc-sensor-chip--${aqiTone}" data-sensor-more>
+                <ha-icon icon="mdi:air-filter" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(aqi)}</span>
+              </button>
+            ` : ""}
+            ${filterPct !== null ? `
+              <button class="mc-sensor-chip" data-sensor-more>
+                <ha-icon icon="mdi:air-purifier" class="mc-chip-icon"></ha-icon>
+                <span>${filterPct}%</span>
+              </button>
+            ` : ""}
+          </div>
+          ` : ""}
+          ${this._sensorDetailsOpen ? `
+          <div class="mc-sensor-detail">
+            ${this._sensorDetailGroups().map(group => `
+              <div class="mc-sensor-group">
+                ${group.label ? `<div class="mc-sensor-group-label">${this._escapeHtml(group.label)}</div>` : ""}
+                <div class="mc-sensor-grid">
+                  ${group.items.map(item => `
+                    <div class="mc-sensor-item">
+                      <div class="mc-sensor-value">${this._escapeHtml(item.value ?? "—")}</div>
+                      <div class="mc-sensor-label">${this._escapeHtml(item.label)}</div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          ` : ""}
+          <!-- U7: Timer flyout -->
+          ${this._timerMenuOpen ? `
+          <div class="mc-timer">
+            <div class="mc-chips">
+              <button class="mc-chip ${activeTimer === 0 ? "mc-chip--active" : ""}" data-timer="0">Off</button>
+              <button class="mc-chip ${activeTimer === 30 ? "mc-chip--active" : ""}" data-timer="30">30m</button>
+              <button class="mc-chip ${activeTimer === 60 ? "mc-chip--active" : ""}" data-timer="60">1h</button>
+              <button class="mc-chip ${activeTimer === 120 ? "mc-chip--active" : ""}" data-timer="120">2h</button>
+              <button class="mc-chip ${activeTimer === 240 ? "mc-chip--active" : ""}" data-timer="240">4h</button>
+              <button class="mc-chip ${activeTimer === 480 ? "mc-chip--active" : ""}" data-timer="480">8h</button>
+              <button class="mc-chip ${this._customTimerOpen ? "mc-chip--active" : ""}" data-timer-custom>Custom</button>
+            </div>
+            ${this._customTimerOpen ? `
+            <div class="mc-timer-custom">
+              <input type="number" class="mc-timer-input timer-custom-input" min="1" max="540" placeholder="Hours" />
+              <button class="mc-chip" data-timer-set>Set</button>
+              <button class="mc-chip" data-timer-cancel>Cancel</button>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+          <!-- U8: Direction presets -->
+          ${this._supportsFanDirection(attributes) ? `
+          <div class="mc-presets">
+            <div class="mc-presets-row">
+              ${this._directionPresets().map(preset => {
+                const isConfirm = this._pendingPresetDeleteId === preset.id;
+                return `
+                  <div class="mc-preset-item ${isConfirm ? "mc-preset-item--confirm" : ""}">
+                    <button class="mc-preset-btn" ${isConfirm ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}"` : `data-preset-apply="${this._escapeHtml(preset.id)}"`} title="${this._escapeHtml(preset.name)}">
+                      <ha-icon icon="${this._escapeHtml(preset.icon)}"></ha-icon>
+                      <span>${this._escapeHtml(preset.name)}</span>
+                    </button>
+                    <button class="mc-preset-remove" data-preset-remove="${this._escapeHtml(preset.id)}" aria-label="${isConfirm ? "Delete" : "Remove"}">×</button>
+                  </div>
+                `;
+              }).join("")}
+              <button class="mc-preset-add" data-preset-add aria-label="Add direction preset">
+                <ha-icon icon="mdi:plus"></ha-icon>
+              </button>
+            </div>
+            ${this._presetEditorOpen ? `
+            <div class="mc-preset-editor">
+              <input type="text" class="mc-timer-input preset-name-input" placeholder="Preset name" value="${this._escapeHtml(this._presetDraftName)}" />
+              <div class="mc-chips" style="flex-wrap:wrap">
+                ${["mdi:crosshairs-gps","mdi:sofa","mdi:bed","mdi:desk","mdi:television","mdi:chair-rolling"].map(icon => `
+                  <button class="mc-chip ${icon === this._presetDraftIcon ? "mc-chip--active" : ""}" data-preset-icon="${this._escapeHtml(icon)}" aria-label="${icon}">
+                    <ha-icon icon="${this._escapeHtml(icon)}"></ha-icon>
+                  </button>
+                `).join("")}
+              </div>
+              <div class="mc-chips">
+                <button class="mc-chip" data-preset-save>Save</button>
+                <button class="mc-chip" data-preset-cancel>Cancel</button>
+              </div>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+          <!-- U9: Heat mode controls -->
+          ${this._climateEntity() ? `
+          <div class="mc-heat">
+            <div class="mc-chips">
+              ${this._hasHeatMode(heatModes, "heat") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "heat" ? "mc-chip--active" : ""}" data-hvac-mode="heat">
+                  <ha-icon icon="mdi:fire" class="mc-chip-icon"></ha-icon>
+                  <span>Heat</span>
+                </button>
+              ` : ""}
+              ${this._hasHeatMode(heatModes, "fan_only") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "fan_only" ? "mc-chip--active" : ""}" data-hvac-mode="fan_only">
+                  <ha-icon icon="mdi:fan" class="mc-chip-icon"></ha-icon>
+                  <span>Fan only</span>
+                </button>
+              ` : ""}
+              ${this._hasHeatMode(heatModes, "off") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "off" ? "mc-chip--active" : ""}" data-hvac-mode="off">
+                  <ha-icon icon="mdi:power" class="mc-chip-icon"></ha-icon>
+                  <span>Off</span>
+                </button>
+              ` : ""}
+            </div>
+            ${targetTemp !== null ? `
+            <div class="mc-temp">
+              <button class="mc-temp-btn" data-temp-step="-1" aria-label="Decrease temperature">−</button>
+              <div class="mc-temp-value">${targetTemp}${this._escapeHtml(tempUnit)}</div>
+              <button class="mc-temp-btn" data-temp-step="1" aria-label="Increase temperature">+</button>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+        </div>
+      </ha-card>
+    `;
+
+    const sliderEl = this.shadowRoot.querySelector(".mc-speed-slider");
+    if (sliderEl) {
+      sliderEl.style.setProperty("--mc-speed-pct", `${speedPercent}%`);
+    }
+
+    this._bindMushroomControls(attributes, powerState);
+  }
+
+  _bindMushroomControls(attributes, powerState) {
+    this.shadowRoot?.querySelector("[data-power-toggle]")?.addEventListener("click", async () => {
+      await this._setPower(powerState === "On" ? "off" : "on");
+    });
+    this._bindWheel(attributes);
+
+    // Auto chip
+    this.shadowRoot?.querySelector("[data-control='auto']")?.addEventListener("click", async () => {
+      await this._setAutoMode(!this._isAutoMode(attributes.preset_mode || attributes.mode, attributes));
+    });
+
+    // Night chip
+    this.shadowRoot?.querySelector("[data-control='night']")?.addEventListener("click", async () => {
+      await this._setNightMode(!this._nightModeOn(attributes));
+    });
+
+    // Direction toggle chip
+    this.shadowRoot?.querySelector("[data-direction-toggle]")?.addEventListener("click", async () => {
+      const current = this._fanDirection(attributes);
+      await this._setAirflowDirection(current === "forward" ? "reverse" : "forward");
+    });
+
+    // Timer chip
+    this.shadowRoot?.querySelector("[data-timer-toggle]")?.addEventListener("click", () => {
+      this._timerMenuOpen = !this._timerMenuOpen;
+      this._render();
+    });
+
+    // Speed slider
+    const speedSlider = this.shadowRoot?.querySelector(".mc-speed-slider");
+    if (speedSlider) {
+      speedSlider.addEventListener("input", (e) => {
+        const pct = Number(e.target.value);
+        e.target.style.setProperty("--mc-speed-pct", `${pct}%`);
+      });
+      speedSlider.addEventListener("change", async (e) => {
+        const pct = Math.round(Number(e.target.value) / 10) * 10;
+        await this._setFanSpeed(pct);
+      });
+    }
+
+    // U6 – sensor strip
+    this.shadowRoot?.querySelectorAll("[data-sensor-more]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._sensorDetailsOpen = !this._sensorDetailsOpen;
+        this._render();
+      });
+    });
+
+    // U7 – timer flyout
+    this.shadowRoot?.querySelectorAll("[data-timer]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._setSleepTimer(Number(btn.dataset.timer));
+        this._timerMenuOpen = false;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelector("[data-timer-custom]")?.addEventListener("click", () => {
+      this._customTimerOpen = !this._customTimerOpen;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-timer-cancel]")?.addEventListener("click", () => {
+      this._customTimerOpen = false;
+      this._timerMenuOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-timer-set]")?.addEventListener("click", async () => {
+      const input = this.shadowRoot?.querySelector(".timer-custom-input");
+      const hours = Number(input?.value || 0);
+      if (hours > 0) {
+        await this._setSleepTimer(hours * 60);
+        this._customTimerOpen = false;
+        this._timerMenuOpen = false;
+        this._render();
+      }
+    });
+
+    // U8 – direction presets
+    this.shadowRoot?.querySelectorAll("[data-preset-apply]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const presets = this._directionPresets();
+        const preset = presets.find(p => p.id === btn.dataset.presetApply);
+        if (preset) await this._commitDirection(preset.direction, this._currentWidth(attributes));
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-remove]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._pendingPresetDeleteId = btn.dataset.presetRemove;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-delete-confirm]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._removeDirectionPreset(btn.dataset.presetDeleteConfirm);
+        this._pendingPresetDeleteId = null;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelector("[data-preset-add]")?.addEventListener("click", () => {
+      this._presetEditorOpen = true;
+      this._presetDraftName = "";
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-preset-save]")?.addEventListener("click", () => {
+      this._addDirectionPreset();
+      this._presetEditorOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-preset-cancel]")?.addEventListener("click", () => {
+      this._presetEditorOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector(".preset-name-input")?.addEventListener("input", (e) => {
+      this._presetDraftName = e.target.value;
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-icon]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._presetDraftIcon = btn.dataset.presetIcon;
+        this._render();
+      });
+    });
+
+    // U9 – heat mode controls
+    this.shadowRoot?.querySelectorAll("[data-hvac-mode]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._setHeatMode(btn.dataset.hvacMode);
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-temp-step]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._adjustTargetTemperature(Number(btn.dataset.tempStep));
+      });
+    });
+  }
 }
 
 customElements.define("ha-dyson-card", HaDysonCard);
+
+if (!customElements.get("ha-dyson-mushroom-card")) {
+  customElements.define("ha-dyson-mushroom-card", HaDysonMushroomCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
