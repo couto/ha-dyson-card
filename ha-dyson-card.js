@@ -1265,12 +1265,17 @@ class HaDysonCard extends HTMLElement {
   async _setAutoMode(enabled) {
     const attributes = this._stateObj(this._config.entity)?.attributes || {};
     if (!this._hass || !this._config.entity || this._busy || !this._supportsAutoMode(attributes)) return;
+    const modes = this._fanModes(attributes);
+    const preset_mode = enabled
+      ? modes.find((m) => String(m).toLowerCase() === "auto")
+      : modes.find((m) => String(m).toLowerCase() !== "auto");
+    if (!preset_mode) return;
     this._busy = true;
     this._render();
     try {
       await this._hass.callService("fan", "set_preset_mode", {
         entity_id: this._config.entity,
-        preset_mode: enabled ? "Auto" : "Manual",
+        preset_mode,
       });
     } finally {
       this._busy = false;
