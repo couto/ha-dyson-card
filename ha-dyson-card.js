@@ -3201,29 +3201,7 @@ class HaDysonCard extends HTMLElement {
               ${this._renderSensorDetails()}
             </div>
             <div class="wheel-wrap">
-              <div class="wheel-stage">
-                <button class="wheel-button" aria-label="Set Dyson direction">
-                  <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
-                    <path class="wheel-bg" d="${travelPath}"></path>
-                    <path class="wheel-ring" d="${travelRingPath}"></path>
-                    <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
-                    <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
-                    <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
-                    <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
-                    <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
-                    <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
-                    ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
-                    <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
-                  </svg>
-                </button>
-                ${this._renderDirectionPresetMarkers()}
-                <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
-                <div class="wheel-center-info">
-                  <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
-                    ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
-                  </div>
-                </div>
-              </div>
+              ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
               <div class="wheel-speed">
                 <div class="speed-control" style="--speed-fill: ${speedPercent}%;">
                   <div class="speed-rail" aria-hidden="true"></div>
@@ -3268,9 +3246,98 @@ class HaDysonCard extends HTMLElement {
 
     this._bindControls(attributes, powerState);
   }
+
+  _renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady }) {
+    return `
+      <div class="wheel-stage">
+        <button class="wheel-button" aria-label="Set Dyson direction">
+          <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
+            <path class="wheel-bg" d="${travelPath}"></path>
+            <path class="wheel-ring" d="${travelRingPath}"></path>
+            <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
+            <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
+            <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
+            <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
+            <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
+            <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
+            ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
+            <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
+          </svg>
+        </button>
+        ${this._renderDirectionPresetMarkers()}
+        <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
+        <div class="wheel-center-info">
+          <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
+            ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+class HaDysonMushroomCard extends HaDysonCard {
+  static getStubConfig() {
+    return {
+      entity: "fan.my_dyson",
+    };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: "entity",
+          required: true,
+          selector: {
+            entity: {
+              filter: [{ domain: "fan" }],
+            },
+          },
+        },
+        {
+          name: "title",
+          selector: { text: {} },
+        },
+      ],
+      computeLabel: (schema) => {
+        switch (schema.name) {
+          case "entity":
+            return "Dyson entity";
+          case "title":
+            return "Title";
+          default:
+            return undefined;
+        }
+      },
+    };
+  }
+
+  _render() {
+    // Full implementation comes in U2-U9
+    // For now, render a minimal placeholder so the card can be added to a dashboard
+    if (!this._hass || !this._config?.entity) return;
+    const entity = this._stateObj(this._config.entity);
+    const powerState = entity?.state === "on" ? "On" : "Off";
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        ha-card { padding: 16px; }
+      </style>
+      <ha-card>
+        <div style="font-size:0.9rem;color:var(--secondary-text-color)">
+          ha-dyson-mushroom-card · ${powerState}
+        </div>
+      </ha-card>
+    `;
+  }
 }
 
 customElements.define("ha-dyson-card", HaDysonCard);
+
+if (!customElements.get("ha-dyson-mushroom-card")) {
+  customElements.define("ha-dyson-mushroom-card", HaDysonMushroomCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
