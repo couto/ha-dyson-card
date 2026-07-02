@@ -3358,6 +3358,20 @@ class HaDysonMushroomCard extends HaDysonCard {
     const activeTimer = Number(attributes.sleep_timer || 0);
     const timerLabel = this._timerLabel(attributes);
 
+    // U6 – sensor strip
+    const temp = this._stateValue(this._temperatureEntity(), "");
+    const humidity = this._stateValue(this._humidityEntity(), "");
+    const aqi = this._stateValue(this._airQualityEntity(), "");
+    const aqiTone = aqi ? this._qualityTone(this._qualityLabel(aqi)) : "neutral";
+    const filterPct = this._filterPercent();
+
+    // U9 – heat mode
+    const climateEntity = this._climateEntity();
+    const climateAttributes = climateEntity ? (this._stateObj(climateEntity)?.attributes || {}) : {};
+    const heatModes = this._heatModes(climateAttributes);
+    const targetTemp = this._targetTemperature(climateAttributes);
+    const tempUnit = climateAttributes.temperature_unit || this._unit(this._temperatureEntity(), "°");
+
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
@@ -3775,6 +3789,217 @@ class HaDysonMushroomCard extends HaDysonCard {
         .mc-chip-icon {
           --mdc-icon-size: 16px;
         }
+
+        /* U6 – sensor strip */
+        .mc-sensors {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        .mc-sensor-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: 28px;
+          padding: 0 8px;
+          border-radius: var(--mush-chip-border-radius, 19px);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: var(--mush-chip-background, var(--card-background-color, #fff));
+          color: var(--secondary-text-color);
+          font: inherit;
+          font-size: 0.72rem;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: var(--mush-chip-box-shadow, none);
+        }
+
+        .mc-sensor-chip--good { color: #4caf50; }
+        .mc-sensor-chip--fair { color: #ff9800; }
+        .mc-sensor-chip--poor { color: #f44336; }
+
+        .mc-sensor-detail {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-sensor-group-label {
+          font-size: 0.7rem;
+          font-weight: 700;
+          color: var(--secondary-text-color);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 4px;
+        }
+
+        .mc-sensor-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+          gap: 6px;
+        }
+
+        .mc-sensor-item {
+          display: grid;
+          gap: 1px;
+          padding: 6px 8px;
+          border-radius: 8px;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+        }
+
+        .mc-sensor-value {
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: var(--primary-text-color);
+        }
+
+        .mc-sensor-label {
+          font-size: 0.66rem;
+          color: var(--secondary-text-color);
+        }
+
+        /* U7 – timer flyout */
+        .mc-timer {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-timer-custom {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .mc-timer-input {
+          flex: 1;
+          min-width: 0;
+          height: 36px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          padding: 0 10px;
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 0.8rem;
+        }
+
+        /* U8 – direction presets */
+        .mc-presets { display: grid; gap: 8px; }
+
+        .mc-presets-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .mc-presets-row::-webkit-scrollbar { display: none; }
+
+        .mc-preset-item {
+          display: inline-flex;
+          align-items: center;
+          flex: 0 0 auto;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-chip-border-radius, 19px);
+          background: var(--mush-chip-background, var(--card-background-color));
+          overflow: hidden;
+        }
+
+        .mc-preset-item--confirm {
+          border-color: rgba(239,68,68,0.5);
+          background: rgba(239,68,68,0.1);
+        }
+
+        .mc-preset-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 0 10px;
+          height: 36px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .mc-preset-remove {
+          width: 30px;
+          height: 36px;
+          border: 0;
+          border-left: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: transparent;
+          color: var(--secondary-text-color);
+          cursor: pointer;
+          font-size: 1rem;
+        }
+
+        .mc-preset-add {
+          flex: 0 0 36px;
+          width: 36px;
+          height: 36px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: 50%;
+          background: var(--mush-chip-background, var(--card-background-color));
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: var(--secondary-text-color);
+        }
+
+        .mc-preset-editor {
+          display: grid;
+          gap: 8px;
+          padding: 10px;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        /* U9 – heat mode */
+        .mc-heat { display: grid; gap: 8px; }
+
+        .mc-temp {
+          display: inline-flex;
+          align-items: center;
+          gap: 0;
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          border-radius: var(--mush-control-border-radius, 12px);
+          overflow: hidden;
+          background: var(--mush-chip-background, var(--card-background-color));
+        }
+
+        .mc-temp-btn {
+          width: 40px;
+          height: 40px;
+          border: 0;
+          background: transparent;
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: 1.2rem;
+          cursor: pointer;
+        }
+
+        .mc-temp-value {
+          flex: 1;
+          text-align: center;
+          font-size: 0.9rem;
+          font-weight: 700;
+          color: var(--primary-text-color);
+          padding: 0 8px;
+        }
       </style>
       <ha-card>
         <div class="mc">
@@ -3835,7 +4060,143 @@ class HaDysonMushroomCard extends HaDysonCard {
               <span>${timerLabel}</span>
             </button>
           </div>
-          <!-- U6-U9 content here -->
+          <!-- U6: Sensor strip -->
+          ${(temp || humidity || aqi || filterPct !== null) ? `
+          <div class="mc-sensors">
+            ${temp ? `
+              <button class="mc-sensor-chip" data-sensor-more aria-label="Show sensor details">
+                <ha-icon icon="mdi:thermometer" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(temp)}${this._escapeHtml(this._unit(this._temperatureEntity(), "°"))}</span>
+              </button>
+            ` : ""}
+            ${humidity ? `
+              <button class="mc-sensor-chip" data-sensor-more>
+                <ha-icon icon="mdi:water-percent" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(humidity)}%</span>
+              </button>
+            ` : ""}
+            ${aqi ? `
+              <button class="mc-sensor-chip mc-sensor-chip--${aqiTone}" data-sensor-more>
+                <ha-icon icon="mdi:air-filter" class="mc-chip-icon"></ha-icon>
+                <span>${this._escapeHtml(aqi)}</span>
+              </button>
+            ` : ""}
+            ${filterPct !== null ? `
+              <button class="mc-sensor-chip" data-sensor-more>
+                <ha-icon icon="mdi:air-purifier" class="mc-chip-icon"></ha-icon>
+                <span>${filterPct}%</span>
+              </button>
+            ` : ""}
+          </div>
+          ` : ""}
+          ${this._sensorDetailsOpen ? `
+          <div class="mc-sensor-detail">
+            ${this._sensorDetailGroups().map(group => `
+              <div class="mc-sensor-group">
+                ${group.label ? `<div class="mc-sensor-group-label">${this._escapeHtml(group.label)}</div>` : ""}
+                <div class="mc-sensor-grid">
+                  ${group.items.map(item => `
+                    <div class="mc-sensor-item">
+                      <div class="mc-sensor-value">${this._escapeHtml(item.value ?? "—")}</div>
+                      <div class="mc-sensor-label">${this._escapeHtml(item.label)}</div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          ` : ""}
+          <!-- U7: Timer flyout -->
+          ${this._timerMenuOpen ? `
+          <div class="mc-timer">
+            <div class="mc-chips">
+              <button class="mc-chip ${activeTimer === 0 ? "mc-chip--active" : ""}" data-timer="0">Off</button>
+              <button class="mc-chip ${activeTimer === 30 ? "mc-chip--active" : ""}" data-timer="30">30m</button>
+              <button class="mc-chip ${activeTimer === 60 ? "mc-chip--active" : ""}" data-timer="60">1h</button>
+              <button class="mc-chip ${activeTimer === 120 ? "mc-chip--active" : ""}" data-timer="120">2h</button>
+              <button class="mc-chip ${activeTimer === 240 ? "mc-chip--active" : ""}" data-timer="240">4h</button>
+              <button class="mc-chip ${activeTimer === 480 ? "mc-chip--active" : ""}" data-timer="480">8h</button>
+              <button class="mc-chip ${this._customTimerOpen ? "mc-chip--active" : ""}" data-timer-custom>Custom</button>
+            </div>
+            ${this._customTimerOpen ? `
+            <div class="mc-timer-custom">
+              <input type="number" class="mc-timer-input timer-custom-input" min="1" max="540" placeholder="Hours" />
+              <button class="mc-chip" data-timer-set>Set</button>
+              <button class="mc-chip" data-timer-cancel>Cancel</button>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+          <!-- U8: Direction presets -->
+          ${this._supportsFanDirection(attributes) ? `
+          <div class="mc-presets">
+            <div class="mc-presets-row">
+              ${this._directionPresets().map(preset => {
+                const isConfirm = this._pendingPresetDeleteId === preset.id;
+                return `
+                  <div class="mc-preset-item ${isConfirm ? "mc-preset-item--confirm" : ""}">
+                    <button class="mc-preset-btn" ${isConfirm ? `data-preset-delete-confirm="${this._escapeHtml(preset.id)}"` : `data-preset-apply="${this._escapeHtml(preset.id)}"`} title="${this._escapeHtml(preset.name)}">
+                      <ha-icon icon="${this._escapeHtml(preset.icon)}"></ha-icon>
+                      <span>${this._escapeHtml(preset.name)}</span>
+                    </button>
+                    <button class="mc-preset-remove" data-preset-remove="${this._escapeHtml(preset.id)}" aria-label="${isConfirm ? "Delete" : "Remove"}">×</button>
+                  </div>
+                `;
+              }).join("")}
+              <button class="mc-preset-add" data-preset-add aria-label="Add direction preset">
+                <ha-icon icon="mdi:plus"></ha-icon>
+              </button>
+            </div>
+            ${this._presetEditorOpen ? `
+            <div class="mc-preset-editor">
+              <input type="text" class="mc-timer-input preset-name-input" placeholder="Preset name" value="${this._escapeHtml(this._presetDraftName)}" />
+              <div class="mc-chips" style="flex-wrap:wrap">
+                ${["mdi:crosshairs-gps","mdi:sofa","mdi:bed","mdi:desk","mdi:television","mdi:chair-rolling"].map(icon => `
+                  <button class="mc-chip ${icon === this._presetDraftIcon ? "mc-chip--active" : ""}" data-preset-icon="${this._escapeHtml(icon)}" aria-label="${icon}">
+                    <ha-icon icon="${this._escapeHtml(icon)}"></ha-icon>
+                  </button>
+                `).join("")}
+              </div>
+              <div class="mc-chips">
+                <button class="mc-chip" data-preset-save>Save</button>
+                <button class="mc-chip" data-preset-cancel>Cancel</button>
+              </div>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
+          <!-- U9: Heat mode controls -->
+          ${this._climateEntity() ? `
+          <div class="mc-heat">
+            <div class="mc-chips">
+              ${this._hasHeatMode(heatModes, "heat") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "heat" ? "mc-chip--active" : ""}" data-hvac-mode="heat">
+                  <ha-icon icon="mdi:fire" class="mc-chip-icon"></ha-icon>
+                  <span>Heat</span>
+                </button>
+              ` : ""}
+              ${this._hasHeatMode(heatModes, "fan_only") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "fan_only" ? "mc-chip--active" : ""}" data-hvac-mode="fan_only">
+                  <ha-icon icon="mdi:fan" class="mc-chip-icon"></ha-icon>
+                  <span>Fan only</span>
+                </button>
+              ` : ""}
+              ${this._hasHeatMode(heatModes, "off") ? `
+                <button class="mc-chip ${climateAttributes.hvac_mode === "off" ? "mc-chip--active" : ""}" data-hvac-mode="off">
+                  <ha-icon icon="mdi:power" class="mc-chip-icon"></ha-icon>
+                  <span>Off</span>
+                </button>
+              ` : ""}
+            </div>
+            ${targetTemp !== null ? `
+            <div class="mc-temp">
+              <button class="mc-temp-btn" data-temp-step="-1" aria-label="Decrease temperature">−</button>
+              <div class="mc-temp-value">${targetTemp}${this._escapeHtml(tempUnit)}</div>
+              <button class="mc-temp-btn" data-temp-step="1" aria-label="Increase temperature">+</button>
+            </div>
+            ` : ""}
+          </div>
+          ` : ""}
         </div>
       </ha-card>
     `;
@@ -3888,6 +4249,99 @@ class HaDysonMushroomCard extends HaDysonCard {
         await this._setFanSpeed(pct);
       });
     }
+
+    // U6 – sensor strip
+    this.shadowRoot?.querySelectorAll("[data-sensor-more]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._sensorDetailsOpen = !this._sensorDetailsOpen;
+        this._render();
+      });
+    });
+
+    // U7 – timer flyout
+    this.shadowRoot?.querySelectorAll("[data-timer]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._setSleepTimer(Number(btn.dataset.timer));
+        this._timerMenuOpen = false;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelector("[data-timer-custom]")?.addEventListener("click", () => {
+      this._customTimerOpen = !this._customTimerOpen;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-timer-cancel]")?.addEventListener("click", () => {
+      this._customTimerOpen = false;
+      this._timerMenuOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-timer-set]")?.addEventListener("click", async () => {
+      const input = this.shadowRoot?.querySelector(".timer-custom-input");
+      const hours = Number(input?.value || 0);
+      if (hours > 0) {
+        await this._setSleepTimer(hours * 60);
+        this._customTimerOpen = false;
+        this._timerMenuOpen = false;
+        this._render();
+      }
+    });
+
+    // U8 – direction presets
+    this.shadowRoot?.querySelectorAll("[data-preset-apply]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const presets = this._directionPresets();
+        const preset = presets.find(p => p.id === btn.dataset.presetApply);
+        if (preset) await this._commitDirection(preset.direction, this._currentWidth(attributes));
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-remove]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._pendingPresetDeleteId = btn.dataset.presetRemove;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-delete-confirm]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._removeDirectionPreset(btn.dataset.presetDeleteConfirm);
+        this._pendingPresetDeleteId = null;
+        this._render();
+      });
+    });
+    this.shadowRoot?.querySelector("[data-preset-add]")?.addEventListener("click", () => {
+      this._presetEditorOpen = true;
+      this._presetDraftName = "";
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-preset-save]")?.addEventListener("click", () => {
+      this._addDirectionPreset();
+      this._presetEditorOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector("[data-preset-cancel]")?.addEventListener("click", () => {
+      this._presetEditorOpen = false;
+      this._render();
+    });
+    this.shadowRoot?.querySelector(".preset-name-input")?.addEventListener("input", (e) => {
+      this._presetDraftName = e.target.value;
+    });
+    this.shadowRoot?.querySelectorAll("[data-preset-icon]")?.forEach(btn => {
+      btn.addEventListener("click", () => {
+        this._presetDraftIcon = btn.dataset.presetIcon;
+        this._render();
+      });
+    });
+
+    // U9 – heat mode controls
+    this.shadowRoot?.querySelectorAll("[data-hvac-mode]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._setHeatMode(btn.dataset.hvacMode);
+      });
+    });
+    this.shadowRoot?.querySelectorAll("[data-temp-step]")?.forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await this._adjustTargetTemperature(Number(btn.dataset.tempStep));
+      });
+    });
   }
 }
 
