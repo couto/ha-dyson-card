@@ -2076,7 +2076,7 @@ class HaDysonCard extends HTMLElement {
         .control-pill.active,
         .timer-chip.active,
         .direction-chip.active {
-          border-color: color-mix(in srgb, var(--primary-color, #4f46e5) 34%, transparent);
+          border-color: ${mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.4)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 34%, transparent)"};
           background: var(--dyson-active-bg);
           color: var(--primary-text-color);
         }
@@ -2241,7 +2241,7 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-direct {
           fill: none;
-          stroke: color-mix(in srgb, var(--primary-color, #4f46e5) 72%, white 8%);
+          stroke: ${mushroomMode ? "color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 72%, white 8%)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 72%, white 8%)"};
           stroke-width: 8;
           stroke-linecap: round;
           pointer-events: none;
@@ -2329,7 +2329,7 @@ class HaDysonCard extends HTMLElement {
           background:
             linear-gradient(
               to top,
-              color-mix(in srgb, var(--primary-color, #03a9f4) 86%, #00bcd4 14%) 0 var(--speed-fill),
+              ${mushroomMode ? "rgb(var(--mush-rgb-state-fan, 76, 175, 80))" : "color-mix(in srgb, var(--primary-color, #03a9f4) 86%, #00bcd4 14%)"} 0 var(--speed-fill),
               color-mix(in srgb, var(--primary-text-color) 8%, transparent) var(--speed-fill) 100%
             );
           box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-text-color) 7%, transparent);
@@ -2423,7 +2423,7 @@ class HaDysonCard extends HTMLElement {
           box-shadow: var(--dyson-inner-highlight);
         }
         .speed-power-button.active {
-          border-color: color-mix(in srgb, var(--primary-color, #4f46e5) 34%, transparent);
+          border-color: ${mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.4)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 34%, transparent)"};
           background: var(--dyson-active-bg);
         }
         .speed-power-button ha-icon {
@@ -2456,7 +2456,7 @@ class HaDysonCard extends HTMLElement {
         }
         .timer-icon-button.active {
           border-color: transparent;
-          background: color-mix(in srgb, var(--primary-color, #4f46e5) 18%, var(--card-background-color, #fff));
+          background: ${mushroomMode ? "var(--dyson-active-bg)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 18%, var(--card-background-color, #fff))"};
         }
         .timer-icon-button ha-icon {
           --mdc-icon-size: 19px;
@@ -2472,7 +2472,7 @@ class HaDysonCard extends HTMLElement {
         }
         .wheel-spinner {
           fill: none;
-          stroke: var(--primary-color, #4f46e5);
+          stroke: ${mushroomMode ? "rgb(var(--mush-rgb-state-fan, 76, 175, 80))" : "var(--primary-color, #4f46e5)"};
           stroke-width: 3;
           stroke-linecap: round;
           stroke-dasharray: 18 34;
@@ -2521,7 +2521,7 @@ class HaDysonCard extends HTMLElement {
           padding: 5px 9px;
           border: 1px solid var(--dyson-soft-border);
           border-radius: 999px;
-          background: color-mix(in srgb, var(--primary-color, #03a9f4) 9%, var(--dyson-pill-bg));
+          background: ${mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.09)" : "color-mix(in srgb, var(--primary-color, #03a9f4) 9%, var(--dyson-pill-bg))"};
           color: var(--primary-text-color);
           font: inherit;
           font-size: 0.66rem;
@@ -2699,7 +2699,7 @@ class HaDysonCard extends HTMLElement {
           background:
             conic-gradient(
               from var(--sweep-start),
-              color-mix(in srgb, var(--primary-color, #03a9f4) 13%, transparent) 0 var(--sweep-size),
+              ${mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.13)" : "color-mix(in srgb, var(--primary-color, #03a9f4) 13%, transparent)"} 0 var(--sweep-size),
               transparent var(--sweep-size) 360deg
             ),
             repeating-conic-gradient(
@@ -2765,9 +2765,9 @@ class HaDysonCard extends HTMLElement {
         }
         .sweep-dial-option.active span {
           background: transparent;
-          color: var(--primary-color, #03a9f4);
+          color: ${mushroomMode ? "rgb(var(--mush-rgb-state-fan, 76, 175, 80))" : "var(--primary-color, #03a9f4)"};
           box-shadow: none;
-          text-shadow: 0 0 10px color-mix(in srgb, var(--primary-color, #03a9f4) 24%, transparent);
+          text-shadow: ${mushroomMode ? "0 0 10px rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.24)" : "0 0 10px color-mix(in srgb, var(--primary-color, #03a9f4) 24%, transparent)"};
         }
         .operation-status {
           min-height: 8px;
@@ -2778,7 +2778,7 @@ class HaDysonCard extends HTMLElement {
           margin: -18px auto -1px;
           padding: 2px 10px;
           border-radius: 999px;
-          background: ${operationActive ? "color-mix(in srgb, var(--primary-color, #03a9f4) 10%, transparent)" : "transparent"};
+          background: ${operationActive ? (mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.1)" : "color-mix(in srgb, var(--primary-color, #03a9f4) 10%, transparent)") : "transparent"};
           color: var(--secondary-text-color);
           font-size: 0.62rem;
           font-weight: 760;
@@ -2822,9 +2822,9 @@ class HaDysonCard extends HTMLElement {
           --mdc-icon-size: 23px;
         }
         .mode-icon-button.active {
-          background: color-mix(in srgb, var(--primary-color, #4f46e5) 18%, transparent);
-          color: var(--primary-text-color);
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #4f46e5) 18%, transparent);
+          background: ${mushroomMode ? "var(--dyson-active-bg)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 18%, transparent)"};
+          color: ${mushroomMode ? "rgb(var(--mush-rgb-state-fan, 76, 175, 80))" : "var(--primary-text-color)"};
+          box-shadow: ${mushroomMode ? "none" : "inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #4f46e5) 18%, transparent)"};
         }
         .mode-icon-button:disabled,
         .temp-step-button:disabled,
@@ -3049,9 +3049,9 @@ class HaDysonCard extends HTMLElement {
           box-shadow: var(--dyson-inner-highlight);
         }
         .preset-icon-option.active {
-          border-color: color-mix(in srgb, var(--primary-color, #4f46e5) 36%, transparent);
+          border-color: ${mushroomMode ? "rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.4)" : "color-mix(in srgb, var(--primary-color, #4f46e5) 36%, transparent)"};
           background: var(--dyson-active-bg);
-          color: var(--primary-color, #03a9f4);
+          color: ${mushroomMode ? "rgb(var(--mush-rgb-state-fan, 76, 175, 80))" : "var(--primary-color, #03a9f4)"};
         }
         .preset-icon-option ha-icon {
           --mdc-icon-size: 18px;
