@@ -3334,6 +3334,25 @@ class HaDysonMushroomCard extends HaDysonCard {
     const entityName = this._config.title || this._friendlyName(this._config.entity, this._config.entity);
     const stateText = isOn ? `On${speedPercent ? ` · ${speedPercent}%` : ""}` : "Off";
 
+    const direction = this._currentDirection(attributes);
+    const width = this._currentWidth(attributes);
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const visualCenter = this._visualAngleFromDevice(bounds.center);
+    const handle = this._pointForAngle(160, 160, 128, visualCenter);
+    const presetWidths = [0, 45, 90, 180, 350];
+    const controlReady = Boolean(this._deviceId());
+    const travelPath = this._sectorPath(160, 160, 128, 5, 355);
+    const travelRingPath = this._arcPath(160, 160, 128, 5, 355);
+    const lowerLimitInner = this._pointForAngle(160, 160, 54, 5);
+    const lowerLimitOuter = this._pointForAngle(160, 160, 132, 5);
+    const upperLimitInner = this._pointForAngle(160, 160, 54, 355);
+    const upperLimitOuter = this._pointForAngle(160, 160, 132, 355);
+    const conePath = bounds.width
+      ? this._sectorPath(160, 160, 128, this._visualAngleFromDevice(bounds.lower), this._visualAngleFromDevice(bounds.upper))
+      : "";
+    const directPath = this._arcPath(160, 160, 116, visualCenter - 1, visualCenter + 1);
+    const operationActive = this._busy || this._pendingActive();
+
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
@@ -3409,6 +3428,252 @@ class HaDysonMushroomCard extends HaDysonCard {
           font-weight: var(--mush-card-secondary-font-weight, 400);
           color: var(--secondary-text-color);
         }
+
+        .mc-wheel {
+          --dyson-wheel-bg: color-mix(in srgb, var(--card-background-color, #fff) 78%, var(--primary-text-color) 22%);
+          --dyson-cone-bg: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.18);
+          --dyson-border: var(--mush-chip-border-color, var(--divider-color));
+          --dyson-soft-border: color-mix(in srgb, var(--mush-chip-border-color, var(--divider-color)) 72%, transparent);
+          --dyson-inner-highlight: none;
+          --dyson-raised-bg: var(--card-background-color, #fff);
+          width: 100%;
+          max-width: 304px;
+          margin: 0 auto;
+        }
+
+        .wheel-stage {
+          position: relative;
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1 / 1;
+        }
+
+        .wheel-button {
+          appearance: none;
+          border: 0;
+          padding: 0;
+          background: none;
+          cursor: default;
+          width: 100%;
+          margin: 0;
+          touch-action: pan-y;
+          display: block;
+        }
+
+        .wheel {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        .wheel-bg {
+          fill: var(--dyson-wheel-bg);
+          pointer-events: none;
+        }
+
+        .wheel-ring {
+          fill: none;
+          stroke: color-mix(in srgb, var(--primary-text-color, #111) 14%, transparent);
+          stroke-width: 2;
+          pointer-events: none;
+        }
+
+        .wheel-limit {
+          stroke: color-mix(in srgb, var(--primary-text-color, #111) 28%, transparent);
+          stroke-width: 3;
+          stroke-linecap: round;
+          pointer-events: none;
+        }
+
+        .wheel-cone {
+          fill: var(--dyson-cone-bg);
+          pointer-events: none;
+        }
+
+        .wheel-direct {
+          fill: none;
+          stroke: color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 72%, white 8%);
+          stroke-width: 8;
+          stroke-linecap: round;
+          pointer-events: none;
+        }
+
+        .wheel-core {
+          fill: transparent;
+          stroke: none;
+          pointer-events: none;
+        }
+
+        .wheel-core-inner {
+          fill: transparent;
+          pointer-events: none;
+        }
+
+        .wheel-spinner {
+          fill: none;
+          stroke: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-dasharray: 18 34;
+          transform-origin: 160px 160px;
+          animation: dyson-spin 1.6s linear infinite;
+        }
+
+        @keyframes dyson-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .wheel-handle {
+          fill: var(--card-background-color, #fff);
+          stroke: var(--primary-text-color, #111);
+          stroke-width: 5;
+          cursor: ${controlReady ? "grab" : "default"};
+          pointer-events: none;
+        }
+
+        .wheel-handle-hit {
+          position: absolute;
+          left: ${((handle.x / 320) * 100).toFixed(4)}%;
+          top: ${((handle.y / 320) * 100).toFixed(4)}%;
+          width: 52px;
+          height: 52px;
+          transform: translate(-50%, -50%);
+          border: 0;
+          border-radius: 999px;
+          padding: 0;
+          background: transparent;
+          cursor: ${controlReady ? "grab" : "default"};
+          touch-action: none;
+          z-index: 3;
+        }
+
+        .wheel-handle-hit:active {
+          cursor: grabbing;
+        }
+
+        .wheel-preset-marker {
+          position: absolute;
+          transform: translate(-50%, -50%);
+          z-index: 2;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--success-color, #22c55e) 82%, transparent);
+          border: 1px solid color-mix(in srgb, white 45%, transparent);
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 42%, transparent),
+            0 4px 10px color-mix(in srgb, #000 24%, transparent);
+          color: white;
+          pointer-events: none;
+        }
+
+        .wheel-preset-marker ha-icon {
+          --mdc-icon-size: 18px;
+          filter: drop-shadow(0 1px 1px color-mix(in srgb, #000 32%, transparent));
+        }
+
+        .wheel-center-info {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 152px;
+          height: 152px;
+          pointer-events: auto;
+          color: var(--primary-text-color);
+          z-index: 3;
+        }
+
+        .sweep-dial {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--dyson-raised-bg) 72%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+          box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+            0 4px 10px color-mix(in srgb, #000 8%, transparent);
+          --sweep-start: 0deg;
+          --sweep-size: 72deg;
+        }
+
+        .sweep-dial-active-0 { --sweep-start: -36deg; }
+        .sweep-dial-active-45 { --sweep-start: 36deg; }
+        .sweep-dial-active-90 { --sweep-start: 108deg; }
+        .sweep-dial-active-180 { --sweep-start: 180deg; }
+        .sweep-dial-active-350 { --sweep-start: 252deg; }
+
+        .sweep-dial::before {
+          content: "";
+          position: absolute;
+          inset: 4px;
+          border-radius: 999px;
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
+          background:
+            conic-gradient(
+              from var(--sweep-start),
+              color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 13%, transparent) 0 var(--sweep-size),
+              transparent var(--sweep-size) 360deg
+            ),
+            repeating-conic-gradient(
+              from -36deg,
+              color-mix(in srgb, var(--primary-text-color) 9%, transparent) 0 1deg,
+              transparent 1deg 72deg
+            );
+          box-shadow: none;
+        }
+
+        .sweep-dial-option {
+          position: absolute;
+          border: 0;
+          border-radius: 999px;
+          background: transparent;
+          color: var(--secondary-text-color);
+          font: inherit;
+          font-size: 0.88rem;
+          font-weight: 860;
+          line-height: 1;
+          width: 44px;
+          height: 44px;
+          padding: 0;
+          transform: translate(-50%, -50%);
+          z-index: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .sweep-dial-option span {
+          min-width: 34px;
+          height: 30px;
+          padding: 0 6px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
+          font-size: inherit;
+          font-weight: inherit;
+        }
+
+        .sweep-dial-option--0  { left: 50%; top: 16%; }
+        .sweep-dial-option--45 { left: 77%; top: 38%; }
+        .sweep-dial-option--90 { left: 67%; top: 74%; }
+        .sweep-dial-option--180 { left: 33%; top: 74%; }
+        .sweep-dial-option--350 { left: 23%; top: 38%; }
+
+        .sweep-dial-option.active span {
+          background: transparent;
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          box-shadow: none;
+          text-shadow: 0 0 10px color-mix(in srgb, rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 24%, transparent);
+        }
+
+        .sweep-dial-option:disabled {
+          opacity: 0.44;
+        }
       </style>
       <ha-card>
         <div class="mc">
@@ -3421,7 +3686,11 @@ class HaDysonMushroomCard extends HaDysonCard {
               <div class="mc-state">${this._escapeHtml(stateText)}</div>
             </div>
           </div>
-          <!-- U3-U9 content here -->
+          <!-- Wheel -->
+          <div class="mc-wheel">
+            ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
+          </div>
+          <!-- U4-U9 content here -->
         </div>
       </ha-card>
     `;
@@ -3433,6 +3702,7 @@ class HaDysonMushroomCard extends HaDysonCard {
     this.shadowRoot?.querySelector("[data-power-toggle]")?.addEventListener("click", async () => {
       await this._setPower(powerState === "On" ? "off" : "on");
     });
+    this._bindWheel(attributes);
   }
 }
 
