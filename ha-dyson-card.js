@@ -3674,6 +3674,62 @@ class HaDysonMushroomCard extends HaDysonCard {
         .sweep-dial-option:disabled {
           opacity: 0.44;
         }
+
+        /* Speed control */
+        .mc-speed {
+          display: grid;
+          gap: 6px;
+        }
+
+        .mc-speed-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: var(--mush-card-secondary-font-size, 12px);
+          color: var(--secondary-text-color);
+        }
+
+        .mc-speed-value {
+          font-weight: 600;
+          color: var(--primary-text-color);
+        }
+
+        .mc-speed-slider {
+          width: 100%;
+          height: 6px;
+          border-radius: 999px;
+          appearance: none;
+          outline: none;
+          border: 0;
+          cursor: pointer;
+          background: linear-gradient(
+            to right,
+            rgb(var(--mush-rgb-state-fan, 76, 175, 80)) 0 var(--mc-speed-pct, 0%),
+            color-mix(in srgb, var(--primary-text-color) 15%, transparent) var(--mc-speed-pct, 0%) 100%
+          );
+        }
+
+        .mc-speed-slider:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+
+        .mc-speed-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+
+        .mc-speed-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+          border: 0;
+        }
       </style>
       <ha-card>
         <div class="mc">
@@ -3690,10 +3746,34 @@ class HaDysonMushroomCard extends HaDysonCard {
           <div class="mc-wheel">
             ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
           </div>
-          <!-- U4-U9 content here -->
+          <!-- Speed control -->
+          ${speedAvailable && isOn ? `
+          <div class="mc-speed">
+            <div class="mc-speed-header">
+              <span class="mc-speed-label">Speed</span>
+              <span class="mc-speed-value">${speedPercent}%</span>
+            </div>
+            <input
+              type="range"
+              class="mc-speed-slider"
+              min="0"
+              max="100"
+              step="10"
+              value="${speedPercent}"
+              ${this._busy ? "disabled" : ""}
+              aria-label="Fan speed"
+            />
+          </div>
+          ` : ""}
+          <!-- U5-U9 content here -->
         </div>
       </ha-card>
     `;
+
+    const sliderEl = this.shadowRoot.querySelector(".mc-speed-slider");
+    if (sliderEl) {
+      sliderEl.style.setProperty("--mc-speed-pct", `${speedPercent}%`);
+    }
 
     this._bindMushroomControls(attributes, powerState);
   }
@@ -3703,6 +3783,19 @@ class HaDysonMushroomCard extends HaDysonCard {
       await this._setPower(powerState === "On" ? "off" : "on");
     });
     this._bindWheel(attributes);
+
+    // Speed slider
+    const speedSlider = this.shadowRoot?.querySelector(".mc-speed-slider");
+    if (speedSlider) {
+      speedSlider.addEventListener("input", (e) => {
+        const pct = Number(e.target.value);
+        e.target.style.setProperty("--mc-speed-pct", `${pct}%`);
+      });
+      speedSlider.addEventListener("change", async (e) => {
+        const pct = Math.round(Number(e.target.value) / 10) * 10;
+        await this._setFanSpeed(pct);
+      });
+    }
   }
 }
 
