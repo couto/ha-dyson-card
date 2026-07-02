@@ -47,6 +47,12 @@ class HaDysonCard extends HTMLElement {
             },
           },
         },
+        {
+          name: "mushroom_theme",
+          selector: {
+            boolean: {},
+          },
+        },
       ],
       computeLabel: (schema) => {
         switch (schema.name) {
@@ -56,6 +62,8 @@ class HaDysonCard extends HTMLElement {
             return "Title";
           case "airflow_control_side":
             return "Airflow control side";
+          case "mushroom_theme":
+            return "Mushroom theme";
           default:
             return undefined;
         }
@@ -64,6 +72,8 @@ class HaDysonCard extends HTMLElement {
         switch (schema.name) {
           case "airflow_control_side":
             return "Places the vertical airflow speed control on the right or left side of the direction wheel.";
+          case "mushroom_theme":
+            return "Match the appearance of Mushroom cards when using a Mushroom theme.";
           default:
             return undefined;
         }
@@ -109,6 +119,7 @@ class HaDysonCard extends HTMLElement {
     this._config = {
       title: "",
       airflow_control_side: "right",
+      mushroom_theme: false,
       ...config,
     };
     this._derived = null;
