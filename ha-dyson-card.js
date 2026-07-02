@@ -2022,6 +2022,23 @@ class HaDysonCard extends HTMLElement {
           font-weight: 750;
           box-shadow: var(--dyson-inner-highlight);
         }
+        .control-pill,
+        .timer-chip,
+        .direction-chip,
+        .speed-power-button,
+        .timer-icon-button,
+        .timer-action,
+        .mode-icon-button,
+        .temp-step-button,
+        .sensor-more-button,
+        .sweep-dial-option,
+        .direction-preset-button,
+        .direction-preset-remove,
+        .direction-preset-add,
+        .preset-action,
+        .preset-icon-option {
+          cursor: pointer;
+        }
         .control-pill {
           display: inline-flex;
           align-items: center;
@@ -2799,6 +2816,7 @@ class HaDysonCard extends HTMLElement {
         .direction-preset-add:disabled,
         .sweep-dial-option:disabled {
           opacity: 0.44;
+          cursor: default;
         }
         .target-temp-wrap {
           display: grid;
