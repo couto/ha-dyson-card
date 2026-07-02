@@ -4279,6 +4279,13 @@ class HaDysonMushroomCard extends HaDysonCard {
     });
     this._bindWheel(attributes);
 
+    // Sweep width preset buttons (0°/45°/90°/180°/350° inside the wheel)
+    this.shadowRoot?.querySelectorAll("[data-sweep-width]")?.forEach((button) => {
+      button.addEventListener("click", async () => {
+        await this._setSweepWidth(Number(button.dataset.sweepWidth), attributes);
+      });
+    });
+
     // Auto chip
     this.shadowRoot?.querySelector("[data-control='auto']")?.addEventListener("click", async () => {
       await this._setAutoMode(!this._isAutoMode(attributes.preset_mode || attributes.mode, attributes));
