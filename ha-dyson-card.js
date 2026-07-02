@@ -5,6 +5,7 @@ class HaDysonCard extends HTMLElement {
     return {
       entity: "fan.my_dyson",
       airflow_control_side: "right",
+      mushroom_theme: false,
     };
   }
 
