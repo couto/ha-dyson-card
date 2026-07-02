@@ -3352,6 +3352,11 @@ class HaDysonMushroomCard extends HaDysonCard {
       : "";
     const directPath = this._arcPath(160, 160, 116, visualCenter - 1, visualCenter + 1);
     const operationActive = this._busy || this._pendingActive();
+    const speedAvailable = this._supportsFanSpeed(attributes);
+    const mode = attributes.preset_mode || attributes.mode || "";
+    const airflowDirection = this._fanDirection(attributes);
+    const activeTimer = Number(attributes.sleep_timer || 0);
+    const timerLabel = this._timerLabel(attributes);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -3730,6 +3735,46 @@ class HaDysonMushroomCard extends HaDysonCard {
           background: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
           border: 0;
         }
+
+        /* Chips */
+        .mc-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--mush-chip-spacing, 8px);
+        }
+
+        .mc-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          height: var(--mush-chip-height, 36px);
+          padding: 0 10px;
+          border-radius: var(--mush-chip-border-radius, 19px);
+          border: 1px solid var(--mush-chip-border-color, var(--divider-color));
+          background: var(--mush-chip-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          font: inherit;
+          font-size: var(--mush-chip-font-size, 0.8rem);
+          font-weight: var(--mush-chip-font-weight, 500);
+          cursor: pointer;
+          white-space: nowrap;
+          box-shadow: var(--mush-chip-box-shadow, none);
+        }
+
+        .mc-chip--active {
+          background: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.2);
+          border-color: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.4);
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+        }
+
+        .mc-chip:disabled {
+          opacity: 0.44;
+          cursor: default;
+        }
+
+        .mc-chip-icon {
+          --mdc-icon-size: 16px;
+        }
       </style>
       <ha-card>
         <div class="mc">
@@ -3765,7 +3810,32 @@ class HaDysonMushroomCard extends HaDysonCard {
             />
           </div>
           ` : ""}
-          <!-- U5-U9 content here -->
+          <!-- Primary chips -->
+          <div class="mc-chips">
+            ${this._supportsAutoMode(attributes) ? `
+              <button class="mc-chip ${this._isAutoMode(mode, attributes) ? "mc-chip--active" : ""}" data-control="auto" aria-label="Auto mode">
+                <ha-icon icon="mdi:motion" class="mc-chip-icon"></ha-icon>
+                <span>Auto</span>
+              </button>
+            ` : ""}
+            ${this._nightModeEntity() ? `
+              <button class="mc-chip ${this._nightModeOn(attributes) ? "mc-chip--active" : ""}" data-control="night" aria-label="Night mode">
+                <ha-icon icon="mdi:weather-night" class="mc-chip-icon"></ha-icon>
+                <span>Night</span>
+              </button>
+            ` : ""}
+            ${this._supportsFanDirection(attributes) ? `
+              <button class="mc-chip ${airflowDirection === "reverse" ? "mc-chip--active" : ""}" data-direction-toggle aria-label="Airflow direction">
+                <ha-icon icon="mdi:swap-horizontal" class="mc-chip-icon"></ha-icon>
+                <span>${airflowDirection === "reverse" ? "Reverse" : "Forward"}</span>
+              </button>
+            ` : ""}
+            <button class="mc-chip ${activeTimer > 0 ? "mc-chip--active" : ""}" data-timer-toggle aria-label="Sleep timer">
+              <ha-icon icon="mdi:timer-outline" class="mc-chip-icon"></ha-icon>
+              <span>${timerLabel}</span>
+            </button>
+          </div>
+          <!-- U6-U9 content here -->
         </div>
       </ha-card>
     `;
@@ -3783,6 +3853,28 @@ class HaDysonMushroomCard extends HaDysonCard {
       await this._setPower(powerState === "On" ? "off" : "on");
     });
     this._bindWheel(attributes);
+
+    // Auto chip
+    this.shadowRoot?.querySelector("[data-control='auto']")?.addEventListener("click", async () => {
+      await this._setAutoMode(!this._isAutoMode(attributes.preset_mode || attributes.mode, attributes));
+    });
+
+    // Night chip
+    this.shadowRoot?.querySelector("[data-control='night']")?.addEventListener("click", async () => {
+      await this._setNightMode(!this._nightModeOn(attributes));
+    });
+
+    // Direction toggle chip
+    this.shadowRoot?.querySelector("[data-direction-toggle]")?.addEventListener("click", async () => {
+      const current = this._fanDirection(attributes);
+      await this._setAirflowDirection(current === "forward" ? "reverse" : "forward");
+    });
+
+    // Timer chip
+    this.shadowRoot?.querySelector("[data-timer-toggle]")?.addEventListener("click", () => {
+      this._timerMenuOpen = !this._timerMenuOpen;
+      this._render();
+    });
 
     // Speed slider
     const speedSlider = this.shadowRoot?.querySelector(".mc-speed-slider");
