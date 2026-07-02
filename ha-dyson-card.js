@@ -3314,22 +3314,125 @@ class HaDysonMushroomCard extends HaDysonCard {
   }
 
   _render() {
-    // Full implementation comes in U2-U9
-    // For now, render a minimal placeholder so the card can be added to a dashboard
-    if (!this._hass || !this._config?.entity) return;
+    if (!this.shadowRoot) return;
+
+    if (!this._hass || !this._config?.entity) {
+      this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:#d9485f;">Entity required</div></ha-card>`;
+      return;
+    }
+
     const entity = this._stateObj(this._config.entity);
-    const powerState = entity?.state === "on" ? "On" : "Off";
+    if (!entity) {
+      this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:#d9485f;">Entity not found: ${this._escapeHtml(this._config.entity)}</div></ha-card>`;
+      return;
+    }
+
+    const attributes = entity.attributes || {};
+    const isOn = entity.state === "on";
+    const powerState = isOn ? "On" : "Off";
+    const speedPercent = this._currentSpeed(attributes);
+    const entityName = this._config.title || this._friendlyName(this._config.entity, this._config.entity);
+    const stateText = isOn ? `On${speedPercent ? ` · ${speedPercent}%` : ""}` : "Off";
+
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
-        ha-card { padding: 16px; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        ha-card {
+          border-radius: var(--ha-card-border-radius, 12px);
+          overflow: hidden;
+          color: var(--primary-text-color);
+        }
+
+        .mc {
+          padding: var(--mush-spacing, 12px);
+          display: grid;
+          gap: 12px;
+        }
+
+        .mc-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .mc-icon-shape {
+          flex-shrink: 0;
+          width: var(--mush-icon-size, 42px);
+          height: var(--mush-icon-size, 42px);
+          border-radius: 50%;
+          border: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+          color: var(--secondary-text-color);
+          cursor: pointer;
+          padding: 0;
+          transition: background 0.2s, color 0.2s;
+        }
+
+        .mc-icon-shape--on {
+          background: rgba(var(--mush-rgb-state-fan, 76, 175, 80), 0.2);
+          color: rgb(var(--mush-rgb-state-fan, 76, 175, 80));
+        }
+
+        .mc-icon {
+          --mdc-icon-size: calc(var(--mush-icon-size, 42px) * 0.55);
+        }
+
+        @keyframes mc-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .mc-icon--spin {
+          animation: mc-spin 2s linear infinite;
+        }
+
+        .mc-info {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .mc-name {
+          font-size: var(--mush-card-primary-font-size, 14px);
+          font-weight: var(--mush-card-primary-font-weight, 500);
+          color: var(--primary-text-color);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .mc-state {
+          font-size: var(--mush-card-secondary-font-size, 12px);
+          font-weight: var(--mush-card-secondary-font-weight, 400);
+          color: var(--secondary-text-color);
+        }
       </style>
       <ha-card>
-        <div style="font-size:0.9rem;color:var(--secondary-text-color)">
-          ha-dyson-mushroom-card · ${powerState}
+        <div class="mc">
+          <div class="mc-header">
+            <button class="mc-icon-shape ${isOn ? "mc-icon-shape--on" : ""}" data-power-toggle aria-label="${isOn ? "Turn off" : "Turn on"}">
+              <ha-icon icon="mdi:fan" class="mc-icon ${isOn ? "mc-icon--spin" : ""}"></ha-icon>
+            </button>
+            <div class="mc-info">
+              <div class="mc-name">${this._escapeHtml(entityName)}</div>
+              <div class="mc-state">${this._escapeHtml(stateText)}</div>
+            </div>
+          </div>
+          <!-- U3-U9 content here -->
         </div>
       </ha-card>
     `;
+
+    this._bindMushroomControls(attributes, powerState);
+  }
+
+  _bindMushroomControls(attributes, powerState) {
+    this.shadowRoot?.querySelector("[data-power-toggle]")?.addEventListener("click", async () => {
+      await this._setPower(powerState === "On" ? "off" : "on");
+    });
   }
 }
 
