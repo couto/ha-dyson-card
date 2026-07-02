@@ -2034,7 +2034,7 @@ class HaDysonCard extends HTMLElement {
           display: grid;
           gap: 8px;
           border: 1px solid var(--dyson-soft-border);
-          border-radius: 18px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "18px"};
           padding: 8px;
           background: var(--dyson-panel-surface);
         }
@@ -2048,7 +2048,7 @@ class HaDysonCard extends HTMLElement {
         .direction-chip {
           min-width: 0;
           border: 1px solid var(--dyson-soft-border);
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-chip-border-radius, 19px)" : "999px"};
           padding: 8px 8px;
           background: var(--dyson-pill-bg);
           color: var(--primary-text-color);
@@ -2087,7 +2087,7 @@ class HaDysonCard extends HTMLElement {
           gap: 6px;
           min-width: 0;
           border: 1px solid var(--dyson-soft-border);
-          border-radius: 18px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "18px"};
           padding: 6px;
           background: color-mix(in srgb, var(--dyson-field-bg) 82%, transparent);
         }
@@ -2413,7 +2413,7 @@ class HaDysonCard extends HTMLElement {
           width: 42px;
           height: 32px;
           border: 1px solid var(--dyson-soft-border);
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "999px"};
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -2437,7 +2437,7 @@ class HaDysonCard extends HTMLElement {
           width: 100%;
           padding: 10px;
           border: 1px solid var(--dyson-border);
-          border-radius: 14px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "14px"};
           background: var(--dyson-raised-bg);
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
         }
@@ -2445,7 +2445,7 @@ class HaDysonCard extends HTMLElement {
           width: 46px;
           height: 34px;
           border: 1px solid var(--dyson-soft-border);
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "999px"};
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -2586,7 +2586,7 @@ class HaDysonCard extends HTMLElement {
           gap: 8px;
           padding: 10px;
           border: 1px solid var(--dyson-border);
-          border-radius: 16px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "16px"};
           background: var(--dyson-control-bg);
           box-shadow: var(--dyson-inner-highlight);
         }
@@ -2807,7 +2807,7 @@ class HaDysonCard extends HTMLElement {
           width: 44px;
           height: 42px;
           border: 0;
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "999px"};
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -2845,7 +2845,7 @@ class HaDysonCard extends HTMLElement {
           height: 42px;
           max-width: 100%;
           margin-left: auto;
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-control-border-radius, 12px)" : "999px"};
           background: var(--dyson-inset-bg);
           border: 1px solid var(--dyson-border);
           box-shadow:
@@ -2946,7 +2946,7 @@ class HaDysonCard extends HTMLElement {
           align-items: center;
           flex: 0 0 auto;
           border: 1px solid var(--dyson-border);
-          border-radius: 999px;
+          border-radius: ${mushroomMode ? "var(--mush-chip-border-radius, 19px)" : "999px"};
           background: var(--dyson-raised-bg);
           overflow: hidden;
         }
