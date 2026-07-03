@@ -3519,10 +3519,47 @@ class HaDysonOscillatorCard extends HaDysonCard {
         }
         .wheel-preset-marker ha-icon { --mdc-icon-size: 18px; }
         .wheel-center-info {
-          position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+          position: absolute;
+          left: 50%; top: 50%;
+          transform: translate(-50%, -50%);
+          width: 152px; height: 152px;
+          pointer-events: auto;
+          color: var(--primary-text-color);
+          z-index: 3;
         }
         .sweep-dial {
-          position: relative; width: 60%; aspect-ratio: 1/1; border-radius: 999px; pointer-events: auto;
+          position: relative;
+          width: 100%; height: 100%;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--card-background-color, #fff) 72%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 7%, transparent);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent), 0 4px 10px color-mix(in srgb, #000 8%, transparent);
+          --sweep-start: 0deg;
+          --sweep-size: 72deg;
+          pointer-events: auto;
+        }
+        .sweep-dial-active-0   { --sweep-start: -36deg; }
+        .sweep-dial-active-45  { --sweep-start:  36deg; }
+        .sweep-dial-active-90  { --sweep-start: 108deg; }
+        .sweep-dial-active-180 { --sweep-start: 180deg; }
+        .sweep-dial-active-350 { --sweep-start: 252deg; }
+        .sweep-dial::before {
+          content: "";
+          position: absolute;
+          inset: 4px;
+          border-radius: 999px;
+          border: 1px solid color-mix(in srgb, var(--primary-text-color) 9%, transparent);
+          background:
+            conic-gradient(
+              from var(--sweep-start),
+              rgba(${accentRgb}, 0.18) 0 var(--sweep-size),
+              transparent var(--sweep-size) 360deg
+            ),
+            repeating-conic-gradient(
+              from -36deg,
+              color-mix(in srgb, var(--primary-text-color) 9%, transparent) 0 1deg,
+              transparent 1deg 72deg
+            );
         }
         .sweep-dial-option {
           position: absolute; border: 0; border-radius: 999px; background: transparent;
