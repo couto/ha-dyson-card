@@ -1076,8 +1076,8 @@ class HaDysonCard extends HTMLElement {
 
   _renderToggleButton(className, label, icon, active, disabled = false) {
     return `
-      <button class="control-pill ${active ? "active" : ""}" ${disabled ? "disabled" : ""} data-control="${className}">
-        <ha-icon icon="${icon}"></ha-icon>
+      <button class="control-pill ${active ? "active" : ""}" ${disabled ? "disabled" : ""} data-control="${className}" aria-pressed="${active ? "true" : "false"}" aria-label="${label} mode, currently ${active ? "on" : "off"}">
+        <ha-icon icon="${icon}" aria-hidden="true"></ha-icon>
         <span>${label}</span>
       </button>
     `;
@@ -1101,7 +1101,7 @@ class HaDysonCard extends HTMLElement {
     const active = currentWidth === preset;
     const label = preset === 0 ? "0" : preset === 350 ? "350" : `${preset}`;
     const title = preset === 0 ? "Direct" : preset === 350 ? "Wide sweep" : `${preset}\u00b0 sweep`;
-    return `<button class="sweep-dial-option sweep-dial-option--${preset} ${active ? "active" : ""}" data-sweep-width="${preset}" title="${this._escapeHtml(title)}" aria-label="${this._escapeHtml(title)}" ${disabled ? "disabled" : ""}>
+    return `<button class="sweep-dial-option sweep-dial-option--${preset} ${active ? "active" : ""}" data-sweep-width="${preset}" title="${this._escapeHtml(title)}" aria-label="${this._escapeHtml(title)}" aria-pressed="${active ? "true" : "false"}" ${disabled ? "disabled" : ""}>
       <span>${label}</span>
     </button>`;
   }
@@ -1552,6 +1552,22 @@ class HaDysonCard extends HTMLElement {
       this._draftWidth = null;
       this._render();
     });
+
+    let _keyCommitTimer = null;
+    handleTarget.addEventListener("keydown", (event) => {
+      const steps = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 };
+      const bigSteps = { ArrowLeft: -45, ArrowDown: -45, ArrowRight: 45, ArrowUp: 45 };
+      const delta = event.shiftKey ? bigSteps[event.key] : steps[event.key];
+      if (delta === undefined) return;
+      event.preventDefault();
+      const current = this._currentDirection(attributes);
+      const next = this._normalizeDeviceAngle(current + delta);
+      this._updateDialPreview(next, currentWidth);
+      clearTimeout(_keyCommitTimer);
+      _keyCommitTimer = setTimeout(async () => {
+        await this._commitDirection(next, currentWidth);
+      }, 150);
+    });
   }
 
   _bindControls(attributes, powerState) {
@@ -1722,7 +1738,22 @@ class HaDysonCard extends HTMLElement {
       this._presetDraftIcon = "mdi:crosshairs-gps";
       this._pendingPresetDeleteId = null;
       this._render();
+      this.shadowRoot?.querySelector("[data-preset-add]")?.focus({ preventScroll: true });
     });
+
+    if (this._presetEditorOpen) {
+      const onEditorKeydown = (event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        this._presetEditorOpen = false;
+        this._presetDraftName = "";
+        this._presetDraftIcon = "mdi:crosshairs-gps";
+        this._pendingPresetDeleteId = null;
+        this._render();
+        this.shadowRoot?.querySelector("[data-preset-add]")?.focus({ preventScroll: true });
+      };
+      this.shadowRoot?.querySelector(".preset-editor")?.addEventListener("keydown", onEditorKeydown);
+    }
 
     this.shadowRoot?.querySelector(".preset-name-input")?.addEventListener("input", (event) => {
       this._presetDraftName = event.target.value || "";
@@ -1862,6 +1893,16 @@ class HaDysonCard extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
 
+    const _focusedSelector = (() => {
+      const el = this.shadowRoot.activeElement;
+      if (!el) return null;
+      for (const attr of ["data-control", "data-timer", "data-hvac-mode", "data-direction"]) {
+        if (el.hasAttribute(attr)) return `[${attr}="${el.getAttribute(attr)}"]`;
+      }
+      if (el.className) return `.${el.className.trim().split(/\s+/)[0]}`;
+      return null;
+    })();
+
     const entityId = this._config.entity;
     const fan = entityId ? this._hass?.states?.[entityId] : null;
 
@@ -1943,6 +1984,28 @@ class HaDysonCard extends HTMLElement {
         *::before,
         *::after {
           box-sizing: border-box;
+        }
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+          outline: 2px solid var(--primary-color, #4f46e5);
+          outline-offset: 2px;
+        }
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .speed-control:has(.speed-slider:focus-visible) {
+          outline: 2px solid var(--primary-color, #4f46e5);
+          outline-offset: 2px;
+          border-radius: 4px;
         }
         ha-card {
           --dyson-panel-bg: color-mix(in srgb, var(--card-background-color, #fff) 94%, #000 6%);
@@ -2038,6 +2101,16 @@ class HaDysonCard extends HTMLElement {
         .preset-action,
         .preset-icon-option {
           cursor: pointer;
+        }
+        .speed-power-button,
+        .timer-icon-button,
+        .direction-preset-remove,
+        .preset-icon-option {
+          min-width: 44px;
+          min-height: 44px;
+        }
+        .temp-step-button {
+          min-width: 44px;
         }
         .control-pill {
           display: inline-flex;
@@ -3178,8 +3251,8 @@ class HaDysonCard extends HTMLElement {
                 <div class="row-label">
                   <span>Airflow</span>
                 </div>
-                <button class="direction-chip active" data-direction-toggle aria-label="Toggle airflow direction" ${airflowDirectionAvailable ? "" : "disabled"}>
-                  <ha-icon icon="${airflowDirection === "forward" ? "mdi:arrow-up-bold" : "mdi:arrow-down-bold"}"></ha-icon>
+                <button class="direction-chip active" data-direction-toggle aria-label="Toggle airflow direction, currently ${airflowDirection}" aria-pressed="${airflowDirection === "reverse" ? "true" : "false"}" ${airflowDirectionAvailable ? "" : "disabled"}>
+                  <ha-icon icon="${airflowDirection === "forward" ? "mdi:arrow-up-bold" : "mdi:arrow-down-bold"}" aria-hidden="true"></ha-icon>
                   <span>${airflowDirection === "forward" ? "Forward" : "Reverse"}</span>
                 </button>
               </div>
@@ -3190,8 +3263,8 @@ class HaDysonCard extends HTMLElement {
                 <div class="timer-inline-buttons">
                   ${this._renderTimerButton(60, "1H", activeTimer)}
                   ${this._renderTimerButton(180, "3H", activeTimer)}
-                  <button class="timer-chip timer-plus ${this._customTimerOpen ? "active" : ""}" data-timer-custom aria-label="Custom sleep timer">
-                    <ha-icon icon="mdi:plus"></ha-icon>
+                  <button class="timer-chip timer-plus ${this._customTimerOpen ? "active" : ""}" data-timer-custom aria-label="Custom sleep timer" aria-expanded="${this._customTimerOpen ? "true" : "false"}">
+                    <ha-icon icon="mdi:plus" aria-hidden="true"></ha-icon>
                   </button>
                 </div>
               </div>
@@ -3211,14 +3284,14 @@ class HaDysonCard extends HTMLElement {
 
           <div class="control-shell">
             <div class="wheel-sensor-strip ${this._sensorDetailsOpen ? "expanded" : ""}">
-              <span class="sensor-temp"><ha-icon icon="mdi:thermometer"></ha-icon>${this._escapeHtml(temp || "—")}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), "\u00b0")) : ""}</span>
-              <span class="sensor-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
-              <span class="sensor-aqi ${aqiTone}"><ha-icon icon="mdi:gauge"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
-              <span class="sensor-filter"><ha-icon icon="mdi:air-filter"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
+              <span class="sensor-temp" aria-label="Temperature: ${this._escapeHtml(temp || 'unknown')}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), '\u00b0')) : ''}"><ha-icon icon="mdi:thermometer" aria-hidden="true"></ha-icon>${this._escapeHtml(temp || "—")}${temp ? this._escapeHtml(this._unit(this._temperatureEntity(), "\u00b0")) : ""}</span>
+              <span class="sensor-humidity" aria-label="Humidity: ${this._escapeHtml(humidity || 'unknown')}${humidity ? '%' : ''}"><ha-icon icon="mdi:water-percent" aria-hidden="true"></ha-icon>${this._escapeHtml(humidity || "—")}${humidity ? this._escapeHtml(this._unit(this._humidityEntity(), "%")) : ""}</span>
+              <span class="sensor-aqi ${aqiTone}" aria-label="Air quality: ${this._escapeHtml(aqi || 'unknown')}"><ha-icon icon="mdi:gauge" aria-hidden="true"></ha-icon>${this._escapeHtml(aqi || "—")}</span>
+              <span class="sensor-filter" aria-label="Filter life: ${filterPercent === null ? 'unknown' : `${filterPercent}%`}"><ha-icon icon="mdi:air-filter" aria-hidden="true"></ha-icon>${filterPercent === null ? "—" : `${filterPercent}%`}</span>
               ${sensorDetailGroups.length ? `
-                <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}">
+                <button class="sensor-more-button ${this._sensorDetailsOpen ? "active" : ""}" data-sensor-more aria-label="${this._sensorDetailsOpen ? "Hide sensor details" : "Show more sensors"}" aria-expanded="${this._sensorDetailsOpen ? "true" : "false"}">
                   <span>${this._sensorDetailsOpen ? "Less" : "More"}</span>
-                  <ha-icon icon="${this._sensorDetailsOpen ? "mdi:chevron-up" : "mdi:dots-horizontal"}"></ha-icon>
+                  <ha-icon icon="${this._sensorDetailsOpen ? "mdi:chevron-up" : "mdi:dots-horizontal"}" aria-hidden="true"></ha-icon>
                 </button>
               ` : ""}
               ${this._renderSensorDetails()}
@@ -3240,9 +3313,9 @@ class HaDysonCard extends HTMLElement {
                   </svg>
                 </button>
                 ${this._renderDirectionPresetMarkers()}
-                <button class="wheel-handle-hit" aria-label="Drag to set Dyson direction"></button>
+                <button class="wheel-handle-hit" aria-label="Direction: ${bounds.center}°${bounds.width ? `, sweeping ${bounds.width}°` : ", direct"}. Drag or use arrow keys (Shift for larger steps)." ${controlReady ? "" : "disabled"}></button>
                 <div class="wheel-center-info">
-                  <div class="sweep-dial sweep-dial-active-${bounds.width}" aria-label="Sweep presets">
+                  <div class="sweep-dial sweep-dial-active-${bounds.width}" role="group" aria-label="Sweep angle presets">
                     ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
                   </div>
                 </div>
@@ -3253,22 +3326,22 @@ class HaDysonCard extends HTMLElement {
                   <input class="speed-slider" type="range" min="0" max="100" step="10" value="${speedPercent}" aria-label="Set airflow speed" ${speedAvailable ? "" : "disabled"} />
                 </div>
                 <span class="speed-value" aria-hidden="true">${speedPercent}%</span>
-                <button class="speed-power-button power-button ${powerState === "On" ? "active" : ""}" aria-label="${powerState === "On" ? "Turn Dyson off" : "Turn Dyson on"}">
-                  <ha-icon icon="mdi:power"></ha-icon>
+                <button class="speed-power-button power-button ${powerState === "On" ? "active" : ""}" aria-label="${powerState === "On" ? "Turn Dyson off" : "Turn Dyson on"}" aria-pressed="${powerState === "On" ? "true" : "false"}">
+                  <ha-icon icon="mdi:power" aria-hidden="true"></ha-icon>
                 </button>
               </div>
             </div>
 
-            <div class="operation-status" aria-live="polite">
+            <div class="operation-status" aria-live="polite" aria-atomic="true">
               ${operationActive ? this._escapeHtml(operationLabel) : ""}
             </div>
 
             <div class="mode-row">
-              <button class="mode-icon-button ${heatMode === "heat" ? "active" : ""}" data-hvac-mode="heat" aria-label="Heat mode" ${this._climateEntity() && this._hasHeatMode(heatModes, "heat") ? "" : "disabled"}>
-                <ha-icon icon="mdi:fire"></ha-icon>
+              <button class="mode-icon-button ${heatMode === "heat" ? "active" : ""}" data-hvac-mode="heat" aria-label="Heat mode, currently ${heatMode === "heat" ? "active" : "inactive"}" aria-pressed="${heatMode === "heat" ? "true" : "false"}" ${this._climateEntity() && this._hasHeatMode(heatModes, "heat") ? "" : "disabled"}>
+                <ha-icon icon="mdi:fire" aria-hidden="true"></ha-icon>
               </button>
-              <button class="mode-icon-button ${heatMode === "fan_only" ? "active" : ""}" data-hvac-mode="fan_only" aria-label="Fan only mode" ${this._climateEntity() && this._hasHeatMode(heatModes, "fan_only") ? "" : "disabled"}>
-                <ha-icon icon="mdi:fan"></ha-icon>
+              <button class="mode-icon-button ${heatMode === "fan_only" ? "active" : ""}" data-hvac-mode="fan_only" aria-label="Fan only mode, currently ${heatMode === "fan_only" ? "active" : "inactive"}" aria-pressed="${heatMode === "fan_only" ? "true" : "false"}" ${this._climateEntity() && this._hasHeatMode(heatModes, "fan_only") ? "" : "disabled"}>
+                <ha-icon icon="mdi:fan" aria-hidden="true"></ha-icon>
               </button>
               <div class="target-temp-wrap">
                 <button class="temp-step-button" data-temp-step="-1" aria-label="Decrease target temperature" ${this._climateEntity() && targetTemperature !== null ? "" : "disabled"}>-</button>
@@ -3285,11 +3358,19 @@ class HaDysonCard extends HTMLElement {
           ${this._renderDirectionPresets(direction, width, controlReady)}
 
           ${controlReady ? "" : `<div class="helper">This card is still resolving the related Dyson device and companion entities from the selected fan entity.</div>`}
+
+          <div class="sr-only" aria-live="polite" aria-atomic="true">
+            ${bounds.width ? `Oscillating ${bounds.center}°, ${bounds.width}° sweep` : `Fixed direction ${bounds.center}°`}
+          </div>
         </div>
       </ha-card>
     `;
 
     this._bindControls(attributes, powerState);
+
+    if (_focusedSelector) {
+      this.shadowRoot.querySelector(_focusedSelector)?.focus({ preventScroll: true });
+    }
   }
 }
 
