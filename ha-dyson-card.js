@@ -1497,6 +1497,34 @@ class HaDysonCard extends HTMLElement {
     return this._deviceAngleFromVisual(degrees);
   }
 
+  _renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady }) {
+    return `
+      <div class="wheel-stage">
+        <button class="wheel-button" aria-label="Set Dyson direction">
+          <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
+            <path class="wheel-bg" d="${travelPath}"></path>
+            <path class="wheel-ring" d="${travelRingPath}"></path>
+            <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
+            <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
+            <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
+            <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
+            <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
+            <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
+            ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
+            <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
+          </svg>
+        </button>
+        ${this._renderDirectionPresetMarkers()}
+        <button class="wheel-handle-hit" aria-label="Direction: ${bounds.center}°${bounds.width ? `, sweeping ${bounds.width}°` : ", direct"}. Drag or use arrow keys (Shift for larger steps)." ${controlReady ? "" : "disabled"}></button>
+        <div class="wheel-center-info">
+          <div class="sweep-dial sweep-dial-active-${bounds.width}" role="group" aria-label="Sweep angle presets">
+            ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   _isPointerOnHandle(event, element, direction) {
     const rect = element.getBoundingClientRect();
     if (!rect.width) return false;
@@ -3297,29 +3325,7 @@ class HaDysonCard extends HTMLElement {
               ${this._renderSensorDetails()}
             </div>
             <div class="wheel-wrap">
-              <div class="wheel-stage">
-                <button class="wheel-button" aria-label="Set Dyson direction">
-                  <svg class="wheel" viewBox="0 0 320 320" role="img" aria-hidden="true">
-                    <path class="wheel-bg" d="${travelPath}"></path>
-                    <path class="wheel-ring" d="${travelRingPath}"></path>
-                    <line class="wheel-limit" x1="${lowerLimitInner.x}" y1="${lowerLimitInner.y}" x2="${lowerLimitOuter.x}" y2="${lowerLimitOuter.y}"></line>
-                    <line class="wheel-limit" x1="${upperLimitInner.x}" y1="${upperLimitInner.y}" x2="${upperLimitOuter.x}" y2="${upperLimitOuter.y}"></line>
-                    <path class="wheel-cone" d="${conePath}" style="${bounds.width ? "" : "display:none;"}"></path>
-                    <path class="wheel-direct" d="${directPath}" style="${bounds.width ? "display:none;" : ""}"></path>
-                    <circle class="wheel-core" cx="160" cy="160" r="48"></circle>
-                    <circle class="wheel-core-inner" cx="160" cy="160" r="36"></circle>
-                    ${operationActive ? `<circle class="wheel-spinner" cx="160" cy="160" r="42"></circle>` : ""}
-                    <circle class="wheel-handle" cx="${handle.x}" cy="${handle.y}" r="13"></circle>
-                  </svg>
-                </button>
-                ${this._renderDirectionPresetMarkers()}
-                <button class="wheel-handle-hit" aria-label="Direction: ${bounds.center}°${bounds.width ? `, sweeping ${bounds.width}°` : ", direct"}. Drag or use arrow keys (Shift for larger steps)." ${controlReady ? "" : "disabled"}></button>
-                <div class="wheel-center-info">
-                  <div class="sweep-dial sweep-dial-active-${bounds.width}" role="group" aria-label="Sweep angle presets">
-                    ${presetWidths.map((preset) => this._renderSweepButton(preset, bounds.width, !controlReady)).join("")}
-                  </div>
-                </div>
-              </div>
+              ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
               <div class="wheel-speed">
                 <div class="speed-control" style="--speed-fill: ${speedPercent}%;">
                   <div class="speed-rail" aria-hidden="true"></div>
@@ -3374,11 +3380,202 @@ class HaDysonCard extends HTMLElement {
   }
 }
 
+class HaDysonOscillatorCard extends HaDysonCard {
+  static getStubConfig() {
+    return { entity: "fan.my_dyson" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        {
+          name: "entity",
+          required: true,
+          selector: { entity: { filter: [{ domain: "fan" }] } },
+        },
+        {
+          name: "color_rgb",
+          selector: { color_rgb: {} },
+        },
+      ],
+      computeLabel: (schema) => {
+        if (schema.name === "entity") return "Dyson entity";
+        if (schema.name === "color_rgb") return "Accent colour";
+        return undefined;
+      },
+      computeHelper: (schema) => {
+        if (schema.name === "color_rgb") return "Colour of the oscillation cone, direction line, and active controls.";
+        return undefined;
+      },
+    };
+  }
+
+  setConfig(config) {
+    if (!config?.entity) throw new Error("Entity is required");
+    this._config = { ...config };
+    this._derived = null;
+    this._render();
+  }
+
+  _render() {
+    if (!this.shadowRoot) return;
+
+    const entityId = this._config?.entity;
+    const fan = entityId ? this._hass?.states?.[entityId] : null;
+
+    if (!entityId || !fan) {
+      this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:var(--error-color,#d32f2f);">${entityId ? `Entity not found: ${this._escapeHtml(entityId)}` : "Set a Dyson entity."}</div></ha-card>`;
+      return;
+    }
+
+    const attributes = fan.attributes || {};
+    const direction = this._currentDirection(attributes);
+    const width = this._currentWidth(attributes);
+    const bounds = this._boundsFromCenterWidth(direction, width);
+    const visualCenter = this._visualAngleFromDevice(bounds.center);
+    const handle = this._pointForAngle(160, 160, 128, visualCenter);
+    const presetWidths = [0, 45, 90, 180, 350];
+    const controlReady = Boolean(this._deviceId());
+    const travelPath = this._sectorPath(160, 160, 128, 5, 355);
+    const travelRingPath = this._arcPath(160, 160, 128, 5, 355);
+    const lowerLimitInner = this._pointForAngle(160, 160, 54, 5);
+    const lowerLimitOuter = this._pointForAngle(160, 160, 132, 5);
+    const upperLimitInner = this._pointForAngle(160, 160, 54, 355);
+    const upperLimitOuter = this._pointForAngle(160, 160, 132, 355);
+    const conePath = bounds.width
+      ? this._sectorPath(160, 160, 128, this._visualAngleFromDevice(bounds.lower), this._visualAngleFromDevice(bounds.upper))
+      : "";
+    const directPath = this._arcPath(160, 160, 116, visualCenter - 1, visualCenter + 1);
+    const operationActive = this._busy || this._pendingActive();
+
+    const [cr, cg, cb] = Array.isArray(this._config.color_rgb) ? this._config.color_rgb : [3, 169, 244];
+    const accentRgb = `${cr}, ${cg}, ${cb}`;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; }
+        *, *::before, *::after { box-sizing: border-box; }
+        button:focus-visible { outline: 2px solid rgb(${accentRgb}); outline-offset: 2px; }
+        .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+        ha-card {
+          padding: 12px;
+          border-radius: var(--ha-card-border-radius, 12px);
+          overflow: hidden;
+        }
+        .osc-wheel {
+          width: 100%;
+          max-width: 304px;
+          margin: 0 auto;
+          position: relative;
+        }
+        .wheel-stage {
+          position: relative;
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1 / 1;
+        }
+        .wheel-button {
+          appearance: none;
+          border: 0;
+          padding: 0;
+          background: none;
+          cursor: default;
+          width: 100%;
+          margin: 0;
+          touch-action: pan-y;
+          display: block;
+        }
+        .wheel { width: 100%; height: auto; display: block; }
+        .wheel-bg { fill: color-mix(in srgb, var(--card-background-color, #fff) 78%, var(--primary-text-color) 22%); pointer-events: none; }
+        .wheel-ring { fill: none; stroke: color-mix(in srgb, var(--primary-text-color, #111) 14%, transparent); stroke-width: 2; pointer-events: none; }
+        .wheel-limit { stroke: color-mix(in srgb, var(--primary-text-color, #111) 28%, transparent); stroke-width: 3; stroke-linecap: round; pointer-events: none; }
+        .wheel-cone { fill: rgba(${accentRgb}, 0.38); pointer-events: none; }
+        .wheel-direct { fill: none; stroke: color-mix(in srgb, rgb(${accentRgb}) 72%, white 8%); stroke-width: 8; stroke-linecap: round; pointer-events: none; }
+        .wheel-core { fill: transparent; stroke: none; pointer-events: none; }
+        .wheel-core-inner { fill: transparent; pointer-events: none; }
+        .wheel-spinner { fill: none; stroke: rgb(${accentRgb}); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 18 34; transform-origin: 160px 160px; animation: osc-spin 1.6s linear infinite; }
+        @keyframes osc-spin { to { transform: rotate(360deg); } }
+        .wheel-handle { fill: var(--card-background-color, #fff); stroke: var(--primary-text-color, #111); stroke-width: 5; cursor: ${controlReady ? "grab" : "default"}; pointer-events: none; }
+        .wheel-handle-hit {
+          position: absolute;
+          left: ${((handle.x / 320) * 100).toFixed(4)}%;
+          top: ${((handle.y / 320) * 100).toFixed(4)}%;
+          width: 52px; height: 52px;
+          transform: translate(-50%, -50%);
+          border: 0; border-radius: 999px; padding: 0;
+          background: transparent;
+          cursor: ${controlReady ? "grab" : "default"};
+          touch-action: none; z-index: 3;
+          min-width: 44px; min-height: 44px;
+        }
+        .wheel-handle-hit:active { cursor: grabbing; }
+        .wheel-preset-marker {
+          position: absolute; transform: translate(-50%, -50%); z-index: 2;
+          display: grid; place-items: center; border-radius: 999px;
+          background: color-mix(in srgb, var(--success-color, #22c55e) 82%, transparent);
+          border: 1px solid color-mix(in srgb, white 45%, transparent);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, white 42%, transparent), 0 4px 10px color-mix(in srgb, #000 24%, transparent);
+          color: white; pointer-events: none;
+        }
+        .wheel-preset-marker ha-icon { --mdc-icon-size: 18px; }
+        .wheel-center-info {
+          position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+        }
+        .sweep-dial {
+          position: relative; width: 60%; aspect-ratio: 1/1; border-radius: 999px; pointer-events: auto;
+        }
+        .sweep-dial-option {
+          position: absolute; border: 0; border-radius: 999px; background: transparent;
+          color: var(--secondary-text-color); font: inherit; font-size: 0.88rem; font-weight: 860; line-height: 1;
+          width: 44px; height: 44px; padding: 0; transform: translate(-50%, -50%); z-index: 1;
+          display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .sweep-dial-option span {
+          min-width: 34px; height: 30px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center;
+          border-radius: 0; background: transparent; box-shadow: none; font-size: inherit; font-weight: inherit;
+        }
+        .sweep-dial-option--0  { left: 50%; top: 16%; }
+        .sweep-dial-option--45  { left: 77%; top: 38%; }
+        .sweep-dial-option--90  { left: 67%; top: 74%; }
+        .sweep-dial-option--180 { left: 33%; top: 74%; }
+        .sweep-dial-option--350 { left: 23%; top: 38%; }
+        .sweep-dial-option.active span { color: rgb(${accentRgb}); text-shadow: 0 0 10px rgba(${accentRgb}, 0.4); }
+        .sweep-dial-option:focus-visible { outline: 2px solid rgb(${accentRgb}); outline-offset: 2px; }
+      </style>
+      <ha-card>
+        <div class="osc-wheel">
+          ${this._renderWheelSvg({ directPath, conePath, travelPath, travelRingPath, lowerLimitInner, lowerLimitOuter, upperLimitInner, upperLimitOuter, handle, bounds, operationActive, presetWidths, controlReady })}
+        </div>
+        <div class="sr-only" aria-live="polite" aria-atomic="true">
+          ${bounds.width ? `Oscillating ${bounds.center}°, ${bounds.width}° sweep` : `Fixed direction ${bounds.center}°`}
+        </div>
+      </ha-card>
+    `;
+
+    // Bind wheel interactions using inherited methods
+    this._bindWheel(attributes);
+
+    // Sweep width preset buttons
+    this.shadowRoot?.querySelectorAll("[data-sweep-width]")?.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await this._setSweepWidth(Number(btn.dataset.sweepWidth), attributes);
+      });
+    });
+  }
+}
+
 customElements.define("ha-dyson-card", HaDysonCard);
+
+customElements.define("ha-dyson-oscillator-card", HaDysonOscillatorCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "ha-dyson-card",
   name: "HA Dyson Card",
   description: "A Dyson Lovelace card with direct oscillation aiming and cone-width control.",
+});
+window.customCards.push({
+  type: "ha-dyson-oscillator-card",
+  name: "HA Dyson Oscillator",
+  description: "Standalone oscillation direction wheel for Dyson fans. Customizable accent colour.",
 });
